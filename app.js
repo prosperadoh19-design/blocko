@@ -575,7 +575,7 @@ function accessField(page, save) {
   const box = h("div", { class: "field" }, h("span", { style: { display: "flex", gap: "6px", alignItems: "center" } }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Who can fill this in?"));
   const opts = h("div", { class: "access-opts" });
   const extra = h("div", { style: { display: "grid", gap: "10px" } });
-  const choices = [["open", "Anyone with the link", "No sign-in needed."], ["code", "People with an access code", "You share a code; they type it first."], ["email", "People who verify their email", "They get a 6-digit code by email first."]];
+  const choices = [["open", "Anyone with the link", "No sign-in needed."], ["code", "People with an access code", "You share a code; they type it first."], ["email", "People who sign in", "A login screen first: they sign in with their email and a 6-digit code."]];
   const draw = () => {
     const cur = page.access || "open";
     opts.replaceChildren(...choices.map(([k, t, d]) => h("label", { class: "access-opt" + (cur === k ? " on" : "") },
@@ -751,58 +751,100 @@ async function viewForm(id, preview) {
         h("button", { class: "btn", onclick: () => route() }, "Send another response"))), madeWith());
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
   } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
-  const access = preview ? "open" : (page.access || "open");
+  const access = page.access || "open";
   if (access === "open" || closed) return mount(pageBg(page), header, form, madeWith());
-  // gate: ask for the access code or a verified email before showing the questions
-  const unlock = () => mount(pageBg(page), header, form, madeWith());
-  const gate = h("div", { class: "form-page" }, h("div", { class: "fblock gate" }));
-  const card = gate.firstChild;
-  const showErr = (m) => { const e = card.querySelector(".msg"); if (e) e.remove(); card.append(h("div", { class: "msg" }, m)); };
+
+  /* ---- sign-in screen: shown before the questions when the creator turned it on ---- */
+  const unlock = async () => {
+    let bar = null;
+    if (access === "email") {
+      const who = await store.respondentEmail().catch(() => null);
+      if (who) bar = h("div", { class: "signed-bar" }, h("span", null, "Signed in as ", h("b", null, who)),
+        h("button", { class: "btn small light", onclick: async () => { await store.forgetRespondent(); route(); } }, "Sign out"));
+    } else bar = h("div", { class: "signed-bar" }, h("span", null, "🔓 Access code accepted"));
+    mount(pageBg(page), bar, header, form, madeWith());
+  };
+  const b0 = page.brand || {};
+  const art = h("aside", { class: "lg-art", style: b0.cover ? { backgroundColor: page.color, backgroundImage: `linear-gradient(160deg, ${hexA(page.color, 0.55)}, ${hexA("#141318", 0.75)}), url("${cssUrl(b0.cover)}")` } : { background: `linear-gradient(160deg, ${page.color}, ${hexA("#141318", 0.9)})` } },
+    preview ? h("button", { class: "btn small light lg-back", onclick: () => go("p-" + page.id) }, icon("back"), "Back to editing") : null,
+    markEl(page, "lg-mark"),
+    h("div", { class: "lg-copy" }, h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null),
+    h("div", { class: "lg-foot" }, preview ? "Preview · this is what visitors see first" : "🔒 Private form"));
+  const panel = h("div", { class: "lg-panel" });
+  const msg = h("div", { class: "lg-msg", role: "alert" });
+  const showErr = m => { msg.textContent = m; msg.hidden = !m; };
+  showErr("");
+  const field = (id, label, input) => h("label", { class: "lg-field", for: id }, h("span", null, label), input);
+  const primary = (text) => h("button", { class: "lg-btn", type: "submit", style: { background: page.color } }, text);
+
   if (access === "code") {
-    const inp = h("input", { class: "input code-in", id: "gcode", autocomplete: "off", maxLength: 20, placeholder: "Access code" });
-    const go2 = h("button", { class: "btn", type: "submit" }, "Open form");
-    card.append(h("div", { class: "gate-ic" }, "🔒"), h("h2", null, "Enter the access code"), h("p", { class: "muted" }, "Whoever shared this form will have given you a code."),
-      h("form", { class: "gate-row", onsubmit: async e => {
-        e.preventDefault(); const c = inp.value.trim(); if (!c) return;
-        go2.disabled = true; go2.textContent = "Checking…";
-        try { if (await store.checkCode(page.id, c)) { submitOpts.code = c; unlock(); return; } showErr("That code isn't right. Check it and try again."); }
-        catch (err) { showErr(err.message); }
-        go2.disabled = false; go2.textContent = "Open form";
-      } }, h("label", { class: "sr", for: "gcode" }, "Access code"), inp, go2));
+    const inp = h("input", { class: "lg-input code-in", id: "gcode", autocomplete: "off", maxLength: 20, placeholder: "e.g. STAFF2026" });
+    const go2 = primary("Continue");
+    panel.append(h("div", { class: "lg-ic" }, "🔑"), h("h2", null, "Enter access code"), h("p", { class: "lg-sub" }, "This form is private. Enter the code you were given to continue."), msg,
+      h("form", { class: "lg-form", onsubmit: async e => {
+        e.preventDefault(); const c = inp.value.trim(); if (!c) return showErr("Type the access code first.");
+        go2.disabled = true; go2.textContent = "Checking…"; showErr("");
+        try {
+          const ok = preview ? (await store.getAccessCode(page.id)).toLowerCase() === c.toLowerCase() : await store.checkCode(page.id, c);
+          if (ok) { submitOpts.code = c; return unlock(); }
+          showErr("That code isn't right. Check it and try again.");
+        } catch (err) { showErr(err.message); }
+        go2.disabled = false; go2.textContent = "Continue";
+      } }, field("gcode", "Access code", inp), go2),
+      h("p", { class: "lg-note" }, "Don't have a code? Ask the person who shared this form."));
   } else {
     const signedIn = await store.respondentEmail().catch(() => null);
     if (signedIn) {
-      card.append(h("div", { class: "gate-ic" }, "✅"), h("h2", null, "You're verified"), h("p", { class: "muted" }, "Continuing as " + signedIn + "."),
-        h("div", { class: "gate-row" }, h("button", { class: "btn", onclick: unlock }, "Continue to the form"),
-          h("button", { class: "btn ghost small", onclick: async () => { await store.forgetRespondent(); route(); } }, "Use a different email")));
+      panel.append(h("div", { class: "lg-ic" }, "👋"), h("h2", null, "Welcome back"), h("p", { class: "lg-sub" }, "You're signed in as ", h("b", null, signedIn), "."), msg,
+        h("div", { class: "lg-form" }, h("button", { class: "lg-btn", style: { background: page.color }, onclick: unlock }, "Continue to the form"),
+          h("button", { class: "lg-link", onclick: async () => { await store.forgetRespondent(); route(); } }, "Not you? Use a different email")));
     } else {
-      const em = h("input", { class: "input", type: "email", id: "gem", autocomplete: "email", placeholder: "you@example.com", required: true });
-      const send = h("button", { class: "btn", type: "submit" }, "Send me a code");
-      const step2 = h("div", { hidden: true, style: { display: "grid", gap: "10px" } });
-      const askCode = (demoCode) => {
-        const code = h("input", { class: "input code-in", id: "gotp", inputMode: "numeric", autocomplete: "one-time-code", maxLength: 6, placeholder: "6-digit code" });
-        const ok = h("button", { class: "btn", type: "submit" }, "Verify");
-        step2.hidden = false;
-        step2.replaceChildren(h("p", { class: "muted", style: { margin: 0 } }, demoCode ? "Demo mode: your code is " + demoCode + ". (Online, it's emailed.)" : "We sent a 6-digit code to " + em.value.trim() + ". Check your inbox and spam folder."),
-          h("form", { class: "gate-row", onsubmit: async e => {
-            e.preventDefault(); ok.disabled = true; ok.textContent = "Checking…";
-            try { await store.verifyCode(em.value.trim(), code.value); unlock(); return; } catch (err) { showErr(err.message); }
-            ok.disabled = false; ok.textContent = "Verify";
-          } }, h("label", { class: "sr", for: "gotp" }, "Code"), code, ok));
-        setTimeout(() => code.focus(), 30);
+      const em = h("input", { class: "lg-input", type: "email", id: "gem", autocomplete: "email", placeholder: "you@example.com" });
+      const send = primary("Continue");
+      const stepEmail = h("form", { class: "lg-form", onsubmit: async e => {
+        e.preventDefault(); const v = em.value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return showErr("Enter a valid email, like name@example.com.");
+        send.disabled = true; send.textContent = "Sending code…"; showErr("");
+        try { const r = await store.sendCode(v); showCode(v, r && r.demoCode); }
+        catch (err) { showErr(err.message); }
+        send.disabled = false; send.textContent = "Continue";
+      } }, field("gem", "Email address", em), send);
+      const head = h("div", { class: "lg-head" }, h("div", { class: "lg-ic" }, "👤"), h("h2", null, "Sign in to continue"), h("p", { class: "lg-sub" }, "Enter your email and we'll send you a 6-digit code. No password needed."));
+      const showCode = (email, demoCode) => {
+        const digits = Array.from({ length: 6 }, (_, i) => h("input", { class: "otp", inputMode: "numeric", autocomplete: i ? "off" : "one-time-code", maxLength: 6, "aria-label": "Digit " + (i + 1) }));
+        const ok = primary("Verify and continue");
+        const val = () => digits.map(d => d.value).join("");
+        digits.forEach((d, i) => {
+          d.addEventListener("input", () => {
+            const v = d.value.replace(/\D/g, "");
+            if (v.length > 1) { v.slice(0, 6).split("").forEach((c, k) => { if (digits[k]) digits[k].value = c; }); digits[Math.min(5, v.length - 1)].focus(); }
+            else { d.value = v; if (v && digits[i + 1]) digits[i + 1].focus(); }
+            if (val().length === 6) ok.click();
+          });
+          d.addEventListener("keydown", e => { if (e.key === "Backspace" && !d.value && digits[i - 1]) digits[i - 1].focus(); });
+        });
+        head.replaceChildren(h("div", { class: "lg-ic" }, "✉️"), h("h2", null, "Check your email"),
+          h("p", { class: "lg-sub" }, "We sent a 6-digit code to ", h("b", null, email), ". It may take a minute; check spam too."),
+          demoCode ? h("div", { class: "lg-demo" }, "Demo mode, no email sent. Your code is ", h("b", null, demoCode)) : null);
+        const f = h("form", { class: "lg-form", onsubmit: async e => {
+          e.preventDefault(); if (val().length < 6) return showErr("Enter all 6 digits.");
+          ok.disabled = true; ok.textContent = "Checking…"; showErr("");
+          try { await store.verifyCode(email, val()); return unlock(); } catch (err) { showErr(err.message); digits.forEach(d => d.value = ""); digits[0].focus(); }
+          ok.disabled = false; ok.textContent = "Verify and continue";
+        } }, h("div", { class: "otp-row" }, digits), ok,
+          h("div", { class: "lg-row" }, h("button", { class: "lg-link", type: "button", onclick: () => route() }, "Use a different email"),
+            h("button", { class: "lg-link", type: "button", onclick: async ev => { ev.target.disabled = true; try { const r = await store.sendCode(email); showCode(email, r && r.demoCode); toast("New code sent"); } catch (err) { showErr(err.message); ev.target.disabled = false; } } }, "Send a new code")));
+        stepEmail.replaceWith(f); stepEmail.remove();
+        panel.querySelectorAll(".lg-form").forEach(x => { if (x !== f) x.remove(); });
+        if (!panel.contains(f)) panel.insertBefore(f, panel.querySelector(".lg-note"));
+        setTimeout(() => digits[0].focus(), 40);
       };
-      card.append(h("div", { class: "gate-ic" }, "✉️"), h("h2", null, "Verify your email"), h("p", { class: "muted" }, "We'll send you a 6-digit code. It only takes a moment."),
-        h("form", { class: "gate-row", onsubmit: async e => {
-          e.preventDefault(); const v = em.value.trim();
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return showErr("Enter a valid email, like name@example.com.");
-          send.disabled = true; send.textContent = "Sending…";
-          try { const r = await store.sendCode(v); askCode(r && r.demoCode); send.textContent = "Send again"; } catch (err) { showErr(err.message); send.textContent = "Send me a code"; }
-          send.disabled = false;
-        } }, h("label", { class: "sr", for: "gem" }, "Email"), em, send), step2);
+      panel.append(head, msg, stepEmail, h("p", { class: "lg-note" }, "We only use your email to confirm it's you."));
     }
   }
-  mount(pageBg(page), header, gate, madeWith());
-  setTimeout(() => { const f = card.querySelector("input"); if (f) f.focus(); }, 50);
+  panel.append(h("div", { class: "lg-secure" }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Secured by Blocko"));
+  mount(h("div", { class: "lg-wrap" }, art, h("main", { class: "lg-main" }, panel)));
+  setTimeout(() => { const f = panel.querySelector("input"); if (f) f.focus(); }, 60);
 }
 const madeWith = () => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"));
 
