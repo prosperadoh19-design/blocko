@@ -139,29 +139,203 @@ const isQuestion = b => !TYPES[b.type]?.content;
 const Q = (type, label, extra = {}) => ({ id: uuid(), type, label, help: "", required: false, ...(TYPES[type].options ? { options: ["Option 1", "Option 2"] } : {}), ...extra });
 const C = (type, text = "") => ({ id: uuid(), type, text });
 
+const BG = n => ({ cover: "backgrounds/" + n + ".jpg", coverMode: "header", tint: 0.4 });
+const opts = (...o) => ({ options: o });
 const TEMPLATES = {
-  blank: { name: "Blank page", emoji: "📝", color: COLORS[0], title: "", description: "", blocks: () => [Q("short", "Your name", { required: true })] },
-  company: { name: "Company form", emoji: "🏢", color: COLORS[7], title: "Your company name", description: "Tell people what this form is for. Add your logo and a background image under Brand.", brand: { cover: "backgrounds/sunset.jpg", coverMode: "header", tint: 0.35 },
-    blocks: () => [C("heading", "Your details"), Q("short", "Full name", { required: true }), Q("email", "Work email", { required: true }), Q("short", "Company"),
-      C("heading", "Your request"), Q("dropdown", "What do you need?", { options: ["A quote", "A demo", "Support", "Something else"] }), Q("long", "Tell us more")] },
-  contact: { name: "Contact form", emoji: "💬", color: COLORS[3], title: "Get in touch", description: "Send us a message and we'll reply within one working day.",
-    blocks: () => [Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number"), Q("long", "How can we help?", { required: true })] },
-  job: { name: "Job application", emoji: "💼", color: COLORS[1], title: "Join our team", description: "Tell us about yourself. It takes about 5 minutes.",
-    blocks: () => [C("heading", "About you"), Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number", { required: true }),
-      C("heading", "The role"), Q("dropdown", "Which role are you applying for?", { required: true, options: ["Sales", "Design", "Engineering", "Operations"] }),
-      Q("choice", "Years of experience", { options: ["Less than 1", "1–3", "3–5", "5+"] }), Q("short", "Link to your CV or portfolio", { help: "Google Drive, LinkedIn or your website" }),
-      Q("long", "Why do you want to work with us?"), Q("date", "Earliest start date")] },
-  event: { name: "Event sign-up", emoji: "🎟️", color: COLORS[2], title: "Save your seat", description: "Register below and we'll send the details to your inbox.",
-    blocks: () => [Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("number", "How many people are coming?", { help: "Including you" }),
-      Q("checkbox", "Which sessions will you attend?", { options: ["Morning talks", "Lunch", "Workshops", "Evening party"] }), Q("yesno", "Any dietary needs?"), Q("long", "Anything else we should know?")] },
-  feedback: { name: "Feedback survey", emoji: "⭐", color: COLORS[4], title: "How did we do?", description: "Two minutes of your time helps us get better.",
-    blocks: () => [Q("rating", "How would you rate your experience?", { required: true }), Q("choice", "How did you hear about us?", { options: ["Friend", "Instagram", "Google", "Other"] }),
-      Q("long", "What did you love?"), Q("long", "What should we improve?"), Q("yesno", "Would you recommend us?")] },
-  order: { name: "Order form", emoji: "🛒", color: COLORS[5], title: "Place an order", description: "Choose what you'd like and we'll confirm by phone.",
-    blocks: () => [Q("short", "Full name", { required: true }), Q("phone", "Phone number", { required: true }), Q("checkbox", "What would you like?", { required: true, options: ["Item A", "Item B", "Item C"] }),
-      Q("number", "Quantity"), Q("choice", "Delivery or pick-up?", { options: ["Delivery", "Pick-up"] }), Q("long", "Delivery address")] }
-};
+  blank: { name: "Blank page", emoji: "📝", color: COLORS[0], cat: "Start", d: "Start from nothing.", title: "", description: "", blocks: () => [Q("short", "Your name", { required: true })] },
 
+  company: { name: "Company request", emoji: "🏢", color: COLORS[7], cat: "Business", d: "Quotes, demos and enquiries for your business.", brand: BG("sunset"),
+    title: "Your company name", description: "Tell us what you need and our team will get back to you within one working day.",
+    thank_you: "Thanks! Your request is in. Someone from our team will contact you within one working day.",
+    blocks: () => [
+      C("heading", "Your details"),
+      Q("short", "Full name", { required: true }), Q("email", "Work email", { required: true }), Q("phone", "Phone number", { required: true }),
+      Q("short", "Company name", { required: true }), Q("dropdown", "Company size", opts("Just me", "2–10", "11–50", "51–200", "200+")), Q("url", "Company website"),
+      C("heading", "Your request"),
+      Q("dropdown", "What do you need?", { required: true, ...opts("A price quote", "A product demo", "A partnership", "Customer support", "Something else") }),
+      Q("long", "Tell us more", { required: true, help: "What are you trying to achieve, and by when?" }),
+      Q("choice", "Budget range", opts("Under ₦500,000", "₦500,000 – ₦2,000,000", "₦2,000,000 – ₦10,000,000", "Above ₦10,000,000", "Not sure yet")),
+      Q("date", "When do you want to start?"), Q("docup", "Attach a brief or document", { help: "Optional: specs, a brief, or anything that helps us understand.", multiple: true }),
+      Q("choice", "Best way to reach you", opts("Phone call", "WhatsApp", "Email")),
+      Q("consent", "I agree to be contacted about this request.", { required: true })] },
+
+  contact: { name: "Contact form", emoji: "💬", color: COLORS[3], cat: "Business", d: "A simple way for anyone to reach you.", brand: BG("ocean"),
+    title: "Get in touch", description: "Send us a message and we'll reply within one working day.",
+    thank_you: "Message received! We'll reply within one working day.",
+    blocks: () => [
+      Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number"),
+      Q("dropdown", "What's this about?", { required: true, ...opts("General question", "Sales", "Support", "Partnership", "Feedback", "Other") }),
+      Q("short", "Subject", { required: true }), Q("long", "Your message", { required: true }),
+      Q("imageup", "Add a screenshot or photo", { help: "Optional", multiple: true }),
+      Q("choice", "How should we reply?", opts("Email", "Phone call", "WhatsApp"))] },
+
+  job: { name: "Job application", emoji: "💼", color: COLORS[1], cat: "HR & team", d: "Collect CVs, details and a signed declaration.", brand: BG("city"),
+    access: "email", one_per_person: true,
+    title: "Join our team", description: "Thanks for your interest! This takes about 10 minutes. Have your CV ready as a PDF or Word file.",
+    thank_you: "Your application has been received. We review every application and will contact shortlisted candidates within two weeks.",
+    blocks: () => [
+      C("heading", "Personal details"),
+      Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number", { required: true }),
+      Q("address", "Home address", { required: true }), Q("date", "Date of birth"),
+      Q("imageup", "Passport photograph", { help: "A clear, recent photo of your face." }),
+      C("heading", "The role"),
+      Q("dropdown", "Position you're applying for", { required: true, ...opts("Sales Executive", "Customer Service", "Graphic Designer", "Software Engineer", "Accountant", "Operations Officer") }),
+      Q("choice", "Employment type", { required: true, ...opts("Full-time", "Part-time", "Contract", "Internship") }),
+      Q("choice", "Work arrangement", opts("On-site", "Remote", "Hybrid")),
+      Q("number", "Expected monthly salary (₦)"), Q("date", "Earliest start date", { required: true }),
+      C("heading", "Experience & education"),
+      Q("choice", "Years of experience", { required: true, ...opts("Less than 1 year", "1–3 years", "3–5 years", "5–10 years", "10+ years") }),
+      Q("short", "Current or most recent employer"), Q("short", "Current job title"),
+      Q("dropdown", "Highest qualification", opts("SSCE / O'Level", "OND / NCE", "HND", "Bachelor's degree", "Master's degree", "PhD", "Other")),
+      Q("short", "Course of study"), Q("url", "LinkedIn or portfolio link"),
+      C("heading", "Documents"),
+      Q("docup", "CV / Résumé", { required: true }), Q("docup", "Cover letter", { help: "Optional" }),
+      Q("docup", "Certificates", { help: "Optional: up to 5 files.", multiple: true }),
+      C("heading", "A few questions"),
+      Q("long", "Why do you want to work with us?", { required: true }),
+      Q("long", "Tell us about an achievement you're proud of"),
+      Q("choice", "How did you hear about this job?", opts("LinkedIn", "Instagram", "Jobberman", "A friend or staff member", "Our website", "Other")),
+      Q("short", "Referee: name and phone number"),
+      C("heading", "Declaration"),
+      Q("consent", "I confirm the information I've given is true and complete.", { required: true }),
+      Q("signature", "Your signature", { required: true })] },
+
+  event: { name: "Event registration", emoji: "🎟️", color: COLORS[2], cat: "Events", d: "Tickets, sessions, dietary needs and guests.", brand: BG("colors"),
+    title: "Save your seat", description: "Register below and we'll send your ticket and event details to your email.",
+    thank_you: "You're registered! 🎉 Check your email for your ticket and event details.",
+    blocks: () => [
+      C("heading", "About you"),
+      Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number", { required: true }),
+      Q("short", "Organisation or company"), Q("short", "Job title"),
+      C("heading", "Your ticket"),
+      Q("choice", "Ticket type", { required: true, ...opts("Regular", "VIP", "Student", "Speaker / Guest") }),
+      Q("number", "Number of people (including you)", { required: true }),
+      Q("checkbox", "Which sessions will you attend?", opts("Opening keynote", "Morning workshops", "Lunch & networking", "Afternoon panels", "Evening party")),
+      Q("time", "What time will you arrive?"),
+      C("heading", "Your needs"),
+      Q("checkbox", "Dietary needs", opts("None", "Vegetarian", "Vegan", "Halal", "No pork", "Nut allergy")),
+      Q("long", "Any access needs we should prepare for?"),
+      Q("short", "Emergency contact: name and phone"),
+      Q("yesno", "Can we take photos of you at the event?"),
+      Q("consent", "I agree to the event terms and code of conduct.", { required: true })] },
+
+  feedback: { name: "Customer feedback", emoji: "⭐", color: COLORS[4], cat: "Surveys", d: "Ratings, likelihood to recommend and comments.", brand: BG("ocean"),
+    title: "How did we do?", description: "Two minutes of your time helps us serve you better.",
+    thank_you: "Thank you for your feedback! It really helps us improve.",
+    blocks: () => [
+      Q("rating", "Overall, how would you rate your experience?", { required: true }),
+      Q("scale", "How likely are you to recommend us to a friend?", { required: true, max: 10, lowLabel: "Not likely", highLabel: "Very likely" }),
+      Q("checkbox", "What did you use or buy?", opts("Product", "Delivery", "Customer support", "Website / app", "In-store service")),
+      Q("scale", "How easy was it to get what you needed?", { max: 5, lowLabel: "Very hard", highLabel: "Very easy" }),
+      Q("long", "What did you love?"), Q("long", "What should we improve?"),
+      Q("imageup", "Share a photo (optional)", { help: "Of your order, a problem, or anything that helps." }),
+      Q("yesno", "May we contact you about your feedback?"),
+      Q("email", "Your email (if we may contact you)")] },
+
+  order: { name: "Order form", emoji: "🛒", color: COLORS[5], cat: "Business", d: "Items, delivery, payment and proof of payment.", brand: BG("sunset"),
+    title: "Place an order", description: "Choose what you'd like. We'll confirm your order and delivery by phone.",
+    thank_you: "Order received! 🛍️ We'll call you shortly to confirm your order and delivery.",
+    blocks: () => [
+      C("heading", "Your details"),
+      Q("short", "Full name", { required: true }), Q("phone", "Phone number", { required: true }), Q("email", "Email"),
+      C("heading", "Your order"),
+      Q("checkbox", "What would you like?", { required: true, ...opts("Item A – ₦5,000", "Item B – ₦8,500", "Item C – ₦12,000", "Gift wrapping – ₦1,000") }),
+      Q("number", "Quantity", { required: true }), Q("long", "Sizes, colours or special requests"),
+      C("heading", "Delivery"),
+      Q("choice", "Delivery or pick-up?", { required: true, ...opts("Delivery", "Pick-up") }),
+      Q("address", "Delivery address"), Q("date", "Preferred delivery date"), Q("time", "Preferred delivery time"),
+      C("heading", "Payment"),
+      Q("choice", "How will you pay?", { required: true, ...opts("Bank transfer", "Card / POS on delivery", "Cash on delivery") }),
+      Q("imageup", "Proof of payment", { help: "If you paid by transfer, upload the receipt or screenshot." }),
+      Q("consent", "I agree to the return and refund policy.", { required: true })] },
+
+  booking: { name: "Appointment booking", emoji: "📅", color: COLORS[6], cat: "Business", d: "Let clients pick a service, date and time.", brand: BG("ocean"),
+    title: "Book an appointment", description: "Pick a service and a time that suits you. We'll confirm by phone or WhatsApp.",
+    thank_you: "Booking request received! We'll confirm your appointment shortly.",
+    blocks: () => [
+      Q("short", "Full name", { required: true }), Q("phone", "Phone / WhatsApp number", { required: true }), Q("email", "Email"),
+      Q("dropdown", "Service", { required: true, ...opts("Consultation", "Follow-up visit", "Full service", "Other") }),
+      Q("datetime", "Preferred date & time", { required: true }), Q("datetime", "Second choice (date & time)"),
+      Q("choice", "First time with us?", opts("Yes", "No")),
+      Q("long", "Anything we should know before your appointment?"),
+      Q("consent", "I understand I should give 24 hours' notice to cancel.", { required: true })] },
+
+  onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
+    access: "code", accessCode: true,
+    title: "Welcome to the team", description: "Please complete this before your first day. It takes about 10 minutes. Your details are only seen by HR.",
+    thank_you: "All done, welcome aboard! HR will be in touch about your first day.",
+    blocks: () => [
+      C("heading", "Personal details"),
+      Q("short", "Full name (as on your ID)", { required: true }), Q("email", "Personal email", { required: true }), Q("phone", "Phone number", { required: true }),
+      Q("address", "Home address", { required: true }), Q("date", "Date of birth", { required: true }),
+      Q("imageup", "Passport photograph", { required: true, help: "For your staff ID card." }),
+      Q("docup", "Means of identification", { required: true, help: "National ID, driver's licence, voter's card or passport (PDF or Word scan)." }),
+      C("heading", "Your role"),
+      Q("dropdown", "Department", { required: true, ...opts("Sales", "Marketing", "Operations", "Finance", "Engineering", "Customer Service", "HR") }),
+      Q("short", "Job title", { required: true }), Q("date", "Start date", { required: true }),
+      Q("dropdown", "T-shirt size", opts("S", "M", "L", "XL", "XXL")),
+      C("heading", "Emergency contact"),
+      Q("short", "Contact name", { required: true }), Q("short", "Relationship", { required: true }), Q("phone", "Contact phone number", { required: true }),
+      C("heading", "Documents & sign-off"),
+      Q("docup", "Signed offer letter", { required: true }), Q("docup", "Certificates", { help: "Up to 5 files.", multiple: true }),
+      Q("consent", "I have read and agree to the staff handbook and company policies.", { required: true }),
+      Q("signature", "Your signature", { required: true })] },
+
+  leave: { name: "Leave request", emoji: "🏖️", color: COLORS[3], cat: "HR & team", d: "Staff request time off with dates and approvals.", brand: BG("sunset"),
+    access: "email",
+    title: "Leave request", description: "Submit at least two weeks before your leave starts (except sick or emergency leave).",
+    thank_you: "Your leave request has been sent to HR and your manager.",
+    blocks: () => [
+      Q("short", "Full name", { required: true }), Q("short", "Staff ID"),
+      Q("dropdown", "Department", { required: true, ...opts("Sales", "Marketing", "Operations", "Finance", "Engineering", "Customer Service", "HR") }),
+      Q("dropdown", "Type of leave", { required: true, ...opts("Annual leave", "Sick leave", "Maternity / paternity", "Compassionate", "Study leave", "Unpaid leave") }),
+      Q("date", "First day of leave", { required: true }), Q("date", "Last day of leave", { required: true }),
+      Q("number", "Number of working days", { required: true }),
+      Q("long", "Reason (optional)"), Q("short", "Who will cover your work?", { required: true }),
+      Q("docup", "Supporting document", { help: "E.g. a medical note, if you have one." }),
+      Q("signature", "Your signature", { required: true })] },
+
+  support: { name: "Complaint / support", emoji: "🛟", color: COLORS[1], cat: "Business", d: "Log a problem with screenshots and urgency.", brand: BG("city"),
+    title: "How can we help?", description: "Tell us what went wrong. Screenshots help us fix things faster.",
+    thank_you: "Thanks, we've logged your request and will reply as soon as possible.",
+    blocks: () => [
+      Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number"),
+      Q("short", "Order or account number"),
+      Q("dropdown", "What's the problem about?", { required: true, ...opts("Order / delivery", "Payment / refund", "Product quality", "Account / login", "Staff or service", "Other") }),
+      Q("choice", "How urgent is it?", { required: true, ...opts("Low: whenever you can", "Medium: in the next few days", "High: as soon as possible") }),
+      Q("long", "Describe what happened", { required: true }), Q("datetime", "When did it happen?"),
+      Q("imageup", "Screenshots or photos", { multiple: true }), Q("docup", "Receipts or documents", { multiple: true }),
+      Q("choice", "Preferred way to reach you", opts("Email", "Phone call", "WhatsApp"))] },
+
+  survey: { name: "Staff survey", emoji: "📊", color: COLORS[4], cat: "Surveys", d: "Anonymous team pulse check with scales.", brand: BG("colors"),
+    title: "Team pulse survey", description: "This survey is anonymous. Please be honest; it helps us make this a better place to work.",
+    thank_you: "Thank you! Your answers are anonymous and will help us improve.",
+    blocks: () => [
+      Q("dropdown", "Your department", opts("Sales", "Marketing", "Operations", "Finance", "Engineering", "Customer Service", "HR", "Prefer not to say")),
+      Q("scale", "How happy are you at work?", { required: true, max: 10, lowLabel: "Not happy", highLabel: "Very happy" }),
+      Q("scale", "I have the tools I need to do my job well.", { max: 5, lowLabel: "Strongly disagree", highLabel: "Strongly agree" }),
+      Q("scale", "My manager supports my growth.", { max: 5, lowLabel: "Strongly disagree", highLabel: "Strongly agree" }),
+      Q("scale", "I understand our goals for this quarter.", { max: 5, lowLabel: "Strongly disagree", highLabel: "Strongly agree" }),
+      Q("rating", "Rate communication across the team"),
+      Q("long", "What's going well?"), Q("long", "What one thing should we change?")] },
+
+  registration: { name: "Member registration", emoji: "🪪", color: COLORS[7], cat: "Events", d: "Clubs, schools, churches and associations.", brand: BG("ocean"),
+    access: "email", one_per_person: true,
+    title: "Become a member", description: "Fill in your details to register. Fields marked * are required.",
+    thank_you: "Welcome! Your registration has been received.",
+    blocks: () => [
+      C("heading", "Your details"),
+      Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number", { required: true }),
+      Q("choice", "Gender", opts("Female", "Male", "Prefer not to say")), Q("date", "Date of birth"),
+      Q("address", "Home address", { required: true }), Q("short", "Occupation"),
+      Q("imageup", "Passport photograph", { help: "For your membership card." }),
+      C("heading", "Membership"),
+      Q("choice", "Membership type", { required: true, ...opts("Regular", "Student", "Family", "Lifetime") }),
+      Q("checkbox", "Areas you'd like to join", opts("Events", "Volunteering", "Media", "Welfare", "Finance")),
+      Q("short", "Who referred you?"),
+      Q("consent", "I agree to abide by the rules and code of conduct.", { required: true }),
+      Q("signature", "Your signature")] }
+};
 /* ============================================================ app state */
 let store, user = null, installEvt = null;
 const go = hash => { if (location.hash === "#" + hash) route(); else location.hash = hash; };
@@ -292,7 +466,18 @@ async function viewHome() {
     store.mode === "cloud" ? h("button", { class: "icon-btn", "aria-label": "Account", onclick: accountSheet }, icon("user")) : null);
   const total = pages.reduce((a, p) => a + (p.response_count || 0), 0);
   const greeting = (() => { const hr = new Date().getHours(); return hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening"; })();
-  const tplBtns = Object.entries(TEMPLATES).map(([k, t], i) => h("button", { class: "tpl" + (i === 0 ? " primary" : ""), onclick: () => newPage(k) }, h("span", { class: "e" }, i === 0 ? icon("plus") : t.emoji), t.name));
+  const tplBtns = [h("button", { class: "tpl primary", onclick: () => newPage("blank") }, h("span", { class: "e" }, icon("plus")), "Blank page"),
+    h("button", { class: "tpl", onclick: () => document.getElementById("templates").scrollIntoView({ behavior: "smooth" }) }, h("span", { class: "e" }, "✨"), "Browse " + (Object.keys(TEMPLATES).length - 1) + " templates")];
+  const cats = [...new Set(Object.values(TEMPLATES).filter(t => t.cat !== "Start").map(t => t.cat))];
+  const gallery = h("section", { id: "templates", class: "tgal" }, h("h2", null, "Start from a template"),
+    h("p", { class: "muted" }, "Ready-made forms with the right questions already in place. Change anything you like."),
+    cats.map(c => [h("h3", null, c), h("div", { class: "tgrid" }, Object.entries(TEMPLATES).filter(([, t]) => t.cat === c).map(([k, t]) => {
+      const n = t.blocks().filter(isQuestion).length;
+      const lock = t.access === "email" ? "Sign-in" : t.access === "code" ? "Access code" : null;
+      return h("button", { class: "tcard", onclick: () => newPage(k) },
+        h("div", { class: "tcard-top", style: bandStyle({ color: t.color, brand: t.brand || {} }, true) }, h("span", { class: "e" }, t.emoji)),
+        h("div", { class: "tcard-body" }, h("b", null, t.name), h("small", null, t.d), h("div", { class: "tmeta" }, h("span", null, n + " questions"), lock ? h("span", { class: "tlock" }, "🔒 " + lock) : null)));
+    }))]));
   const cards = pages.length ? pages.map(p => {
     const st = !p.published ? ["draft", "Draft"] : p.accepting ? ["live", "Live"] : ["closed", "Closed"];
     return h("div", { class: "card" },
@@ -302,10 +487,10 @@ async function viewHome() {
         h("button", { onclick: () => go("r-" + p.id), style: { display: "flex", alignItems: "baseline", gap: "6px" }, "aria-label": "See responses" }, h("b", null, p.response_count || 0), h("span", { class: "muted" }, (p.response_count === 1 ? "response" : "responses"))),
         h("div", { class: "spacer" }), h("span", { class: "pill " + st[0] }, st[1])),
       h("button", { class: "icon-btn card-menu", "aria-label": "Page options", onclick: () => cardMenu(p) }, icon("more")));
-  }) : [h("div", { class: "empty" }, h("h3", null, "Make your first page"), h("p", { class: "muted" }, "Pick a starting point above. You can change everything later."))];
+  }) : [h("div", { class: "empty" }, h("h3", null, "Make your first page"), h("p", { class: "muted" }, "Start with a blank page above, or pick a ready-made template below."))];
   mount(shell("var(--brand)", null,
     [topBar(logo(), right), h("h1", null, greeting + "."), h("p", null, pages.length ? `${pages.length} page${pages.length === 1 ? "" : "s"} · ${total} response${total === 1 ? "" : "s"} collected` : "Make pages that tell and forms that collect."), h("div", { class: "new-row" }, tplBtns)],
-    h("main", { class: "wrap" }, h("div", { class: "grid" }, cards))));
+    h("main", { class: "wrap" }, h("div", { class: "grid" }, cards), gallery)));
 }
 function cardMenu(p) {
   sheet((b, close) => b.append(h("h2", null, p.title || "Untitled page"), h("div", { class: "menu" },
@@ -369,7 +554,9 @@ function accountSheet() {
 }
 async function newPage(key) {
   const t = TEMPLATES[key];
-  const p = await store.savePage({ id: uuid(), title: t.title, description: t.description, emoji: t.emoji, color: t.color, brand: { ...(t.brand || {}) }, blocks: t.blocks(), published: false, accepting: true, thank_you: "" });
+  const p = await store.savePage({ id: uuid(), title: t.title, description: t.description, emoji: t.emoji, color: t.color, brand: { ...(t.brand || {}) }, blocks: t.blocks(),
+    access: t.access || "open", one_per_person: !!t.one_per_person, published: false, accepting: true, thank_you: t.thank_you || "" });
+  if (t.accessCode) { const al = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; try { await store.setAccessCode(p.id, Array.from(crypto.getRandomValues(new Uint8Array(8)), n => al[n % al.length]).join("")); } catch (e) {} }
   if (key === "company") sessionStorage.setItem("blocko.showBrand", p.id);
   go("p-" + p.id);
 }

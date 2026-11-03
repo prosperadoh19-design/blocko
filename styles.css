@@ -424,3 +424,20 @@ td .file-chip{max-width:240px}
 .field.flash{box-shadow:0 0 0 3px var(--brand);border-radius:14px}
 .pv-bar{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;background:#fff4dc;color:#7a4b00;font-weight:600;font-size:14px;padding:10px 16px}
 @media (max-width:700px){.lock-pill{padding:0 10px;font-size:12px}.save-state{display:none}}
+/* v10: template gallery */
+.tgal{margin:10px 0 70px}
+.tgal>h2{font-size:34px;font-weight:800}
+.tgal>p{margin:6px 0 4px}
+.tgal h3{font-family:var(--ui);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:24px 0 10px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.tcard{background:var(--paper);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;text-align:left;display:flex;flex-direction:column;transition:transform .15s}
+.tcard:hover{transform:translateY(-3px)}
+.tcard-top{height:84px;padding:14px;display:flex;align-items:flex-end}
+.tcard-top .e{font-size:30px;line-height:1;background:rgba(255,255,255,.9);border-radius:12px;width:46px;height:46px;display:grid;place-items:center}
+.tcard-body{padding:14px 16px 16px;display:grid;gap:4px}
+.tcard-body b{font-size:17px}
+.tcard-body small{color:var(--muted);font-size:13.5px;line-height:1.35}
+.tmeta{display:flex;gap:8px;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--muted)}
+.tmeta span{background:var(--bg);border-radius:999px;padding:3px 9px}
+.tmeta .tlock{background:#fff4dc;color:#7a4b00}
+.tmeta span{white-space:nowrap}.tmeta{flex-wrap:wrap}
