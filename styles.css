@@ -340,3 +340,20 @@ input[type=range]{width:100%;accent-color:var(--brand)}
 td{min-width:120px}
 td .chips{flex-direction:column;align-items:flex-start}
 td .file-chip{max-width:240px}
+/* v5: who can fill in a form */
+.access-opts{display:grid;gap:6px}
+.access-opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:2px solid var(--line);border-radius:14px;cursor:pointer;font-weight:400}
+.access-opt.on{border-color:var(--ink);background:var(--bg)}
+.access-opt input{margin-top:3px;accent-color:var(--brand)}
+.access-opt b{display:block;font-size:14.5px}
+.access-opt small{color:var(--muted);font-size:12.5px}
+.fblock.gate{text-align:center;padding:34px 24px;display:grid;gap:12px;justify-items:center}
+.gate h2{font-size:30px;font-weight:800}
+.gate p{margin:0;max-width:420px}
+.gate-ic{font-size:44px;line-height:1}
+.gate-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:100%;max-width:440px}
+.gate-row .input{flex:1;min-width:200px}
+.gate-row .btn{background:var(--page);border-color:var(--page);color:#fff;height:50px}
+.gate-row .btn.ghost{background:transparent;border-color:transparent;color:var(--ink);height:38px}
+.code-in{text-align:center;font-weight:800;letter-spacing:.2em;font-size:20px;text-transform:uppercase}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}

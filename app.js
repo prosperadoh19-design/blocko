@@ -515,6 +515,7 @@ async function viewEditor(id) {
     h("div", { class: "field" }, "Color", colorRow),
     brandBox,
     h("label", { class: "field" }, "Message after someone submits", thanks),
+    accessField(page, save),
     alertsField(page),
     h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
@@ -561,6 +562,38 @@ function brandSettings(page, refresh, save) {
   return box;
 }
 
+function accessField(page, save) {
+  const box = h("div", { class: "field" }, h("span", { style: { display: "flex", gap: "6px", alignItems: "center" } }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Who can fill this in?"));
+  const opts = h("div", { class: "access-opts" });
+  const extra = h("div", { style: { display: "grid", gap: "10px" } });
+  const choices = [["open", "Anyone with the link", "No sign-in needed."], ["code", "People with an access code", "You share a code; they type it first."], ["email", "People who verify their email", "They get a 6-digit code by email first."]];
+  const draw = () => {
+    const cur = page.access || "open";
+    opts.replaceChildren(...choices.map(([k, t, d]) => h("label", { class: "access-opt" + (cur === k ? " on" : "") },
+      h("input", { type: "radio", name: "access-" + page.id, checked: cur === k, onchange: () => { page.access = k; if (k !== "email") page.one_per_person = false; save(); draw(); } }),
+      h("span", null, h("b", null, t), h("small", null, d)))));
+    extra.replaceChildren();
+    if (cur === "code") {
+      const inp = h("input", { class: "input", id: "acode", maxLength: 20, placeholder: "e.g. STAFF2026", autocomplete: "off", style: { fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" } });
+      const note = h("small", { class: "muted", style: { fontWeight: 400 } }, "Share this code only with the people who should fill in the form.");
+      store.getAccessCode(page.id).then(c => { inp.value = c || ""; if (!c) note.textContent = "Set a code so people can open the form."; }).catch(() => {});
+      let t; const saveCode = v => { clearTimeout(t); t = setTimeout(async () => {
+        if (v && !/^[A-Za-z0-9-]{4,20}$/.test(v)) { note.textContent = "Use 4–20 letters, numbers or dashes."; return; }
+        try { await store.setAccessCode(page.id, v.toUpperCase()); note.textContent = v ? "Code saved. Share it only with the people who should fill in the form." : "Set a code so people can open the form."; } catch (e) { note.textContent = e.message; }
+      }, 600); };
+      inp.oninput = () => saveCode(inp.value.trim());
+      const gen = h("button", { class: "btn small", type: "button", onclick: () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; inp.value = Array.from(crypto.getRandomValues(new Uint8Array(8)), n => a[n % a.length]).join(""); saveCode(inp.value); } }, "Generate");
+      extra.append(h("label", { class: "field", for: "acode" }, "Access code", h("div", { style: { display: "flex", gap: "8px" } }, inp, gen), note));
+    }
+    if (cur === "email") {
+      extra.append(h("label", { class: "switch" }, h("input", { type: "checkbox", checked: !!page.one_per_person, onchange: e => { page.one_per_person = e.target.checked; save(); } }), "Only one response per person"),
+        h("small", { class: "muted", style: { fontWeight: 400 } }, store.mode === "demo" ? "In demo mode the code appears on screen instead of being emailed." : "Their verified email is saved with their answers."));
+    }
+  };
+  draw(); box.append(opts, extra);
+  return box;
+}
+
 function alertsField(page) {
   const inp = h("input", { class: "input", type: "text", inputMode: "email", placeholder: "you@company.com", id: "alerts", autocomplete: "off" });
   const note = h("small", { class: "muted", style: { fontWeight: 400 } }, store.mode === "demo" ? "Email alerts start working once the app is online." : "Separate several emails with commas.");
@@ -592,6 +625,7 @@ async function viewForm(id, preview) {
   document.title = (page.title || "Form") + " · Blocko";
   const answers = {};
   const blockEls = {};
+  const submitOpts = {};
   const header = h("header", { class: "band on-color" + ((page.brand || {}).coverMode === "page" && (page.brand || {}).cover ? " clear" : ""), style: bandStyle(page) }, h("div", { class: "wrap", style: { maxWidth: "760px" } },
     preview ? topBar(h("button", { class: "btn small light", onclick: () => go("p-" + page.id) }, icon("back"), "Back to editing"), h("span", { class: "save-state" }, "Preview")) : null,
     markEl(page),
@@ -702,13 +736,64 @@ async function viewForm(id, preview) {
         }
       }
       btn.textContent = "Sending…";
-      await store.submitResponse(page.id, out);
+      await store.submitResponse(page.id, out, submitOpts);
       mount(pageBg(page), header, h("div", { class: "form-page" }, h("div", { class: "fblock thanks" }, h("div", { class: "big" }, "🎉"), h("h2", null, "Sent!"),
         h("p", { class: "muted", style: { fontSize: "18px" } }, page.thank_you || "Thanks! We got your answers."),
         h("button", { class: "btn", onclick: () => route() }, "Send another response"))), madeWith());
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
   } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
-  mount(pageBg(page), header, form, madeWith());
+  const access = preview ? "open" : (page.access || "open");
+  if (access === "open" || closed) return mount(pageBg(page), header, form, madeWith());
+  // gate: ask for the access code or a verified email before showing the questions
+  const unlock = () => mount(pageBg(page), header, form, madeWith());
+  const gate = h("div", { class: "form-page" }, h("div", { class: "fblock gate" }));
+  const card = gate.firstChild;
+  const showErr = (m) => { const e = card.querySelector(".msg"); if (e) e.remove(); card.append(h("div", { class: "msg" }, m)); };
+  if (access === "code") {
+    const inp = h("input", { class: "input code-in", id: "gcode", autocomplete: "off", maxLength: 20, placeholder: "Access code" });
+    const go2 = h("button", { class: "btn", type: "submit" }, "Open form");
+    card.append(h("div", { class: "gate-ic" }, "🔒"), h("h2", null, "Enter the access code"), h("p", { class: "muted" }, "Whoever shared this form will have given you a code."),
+      h("form", { class: "gate-row", onsubmit: async e => {
+        e.preventDefault(); const c = inp.value.trim(); if (!c) return;
+        go2.disabled = true; go2.textContent = "Checking…";
+        try { if (await store.checkCode(page.id, c)) { submitOpts.code = c; unlock(); return; } showErr("That code isn't right. Check it and try again."); }
+        catch (err) { showErr(err.message); }
+        go2.disabled = false; go2.textContent = "Open form";
+      } }, h("label", { class: "sr", for: "gcode" }, "Access code"), inp, go2));
+  } else {
+    const signedIn = await store.respondentEmail().catch(() => null);
+    if (signedIn) {
+      card.append(h("div", { class: "gate-ic" }, "✅"), h("h2", null, "You're verified"), h("p", { class: "muted" }, "Continuing as " + signedIn + "."),
+        h("div", { class: "gate-row" }, h("button", { class: "btn", onclick: unlock }, "Continue to the form"),
+          h("button", { class: "btn ghost small", onclick: async () => { await store.forgetRespondent(); route(); } }, "Use a different email")));
+    } else {
+      const em = h("input", { class: "input", type: "email", id: "gem", autocomplete: "email", placeholder: "you@example.com", required: true });
+      const send = h("button", { class: "btn", type: "submit" }, "Send me a code");
+      const step2 = h("div", { hidden: true, style: { display: "grid", gap: "10px" } });
+      const askCode = (demoCode) => {
+        const code = h("input", { class: "input code-in", id: "gotp", inputMode: "numeric", autocomplete: "one-time-code", maxLength: 6, placeholder: "6-digit code" });
+        const ok = h("button", { class: "btn", type: "submit" }, "Verify");
+        step2.hidden = false;
+        step2.replaceChildren(h("p", { class: "muted", style: { margin: 0 } }, demoCode ? "Demo mode: your code is " + demoCode + ". (Online, it's emailed.)" : "We sent a 6-digit code to " + em.value.trim() + ". Check your inbox and spam folder."),
+          h("form", { class: "gate-row", onsubmit: async e => {
+            e.preventDefault(); ok.disabled = true; ok.textContent = "Checking…";
+            try { await store.verifyCode(em.value.trim(), code.value); unlock(); return; } catch (err) { showErr(err.message); }
+            ok.disabled = false; ok.textContent = "Verify";
+          } }, h("label", { class: "sr", for: "gotp" }, "Code"), code, ok));
+        setTimeout(() => code.focus(), 30);
+      };
+      card.append(h("div", { class: "gate-ic" }, "✉️"), h("h2", null, "Verify your email"), h("p", { class: "muted" }, "We'll send you a 6-digit code. It only takes a moment."),
+        h("form", { class: "gate-row", onsubmit: async e => {
+          e.preventDefault(); const v = em.value.trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return showErr("Enter a valid email, like name@example.com.");
+          send.disabled = true; send.textContent = "Sending…";
+          try { const r = await store.sendCode(v); askCode(r && r.demoCode); send.textContent = "Send again"; } catch (err) { showErr(err.message); send.textContent = "Send me a code"; }
+          send.disabled = false;
+        } }, h("label", { class: "sr", for: "gem" }, "Email"), em, send), step2);
+    }
+  }
+  mount(pageBg(page), header, gate, madeWith());
+  setTimeout(() => { const f = card.querySelector("input"); if (f) f.focus(); }, 50);
 }
 const madeWith = () => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"));
 
@@ -721,6 +806,7 @@ async function viewResponses(id) {
   try { rows = await store.listResponses(id); } catch (e) { toast(e.message); }
   let mode = "summary";
   const qs = page.blocks.filter(isQuestion);
+  const hasEmail = rows.some(r => r.respondent_email);
   const week = rows.filter(r => Date.now() - new Date(r.created_at) < 7 * 864e5).length;
   const band = h("header", { class: "band on-color", style: bandStyle({ ...page, brand: { ...(page.brand || {}), coverMode: "header" } }) }, h("div", { class: "wrap" },
     topBar(h("div", { style: { display: "flex", alignItems: "center", gap: "4px" } }, h("button", { class: "icon-btn", "aria-label": "Back to home", onclick: () => go("home") }, icon("back")), logo()),
@@ -770,15 +856,15 @@ async function viewResponses(id) {
       })));
     } else {
       content.replaceChildren(h("div", { class: "table-wrap" }, h("table", null,
-        h("thead", null, h("tr", null, h("th", null, "Submitted"), qs.map(b => h("th", null, b.label || "Untitled")), h("th", null, ""))),
-        h("tbody", null, rows.map(r => h("tr", null, h("td", { style: { whiteSpace: "nowrap" } }, fmtDate(r.created_at)), qs.map(b => h("td", null, cell(r, b))),
+        h("thead", null, h("tr", null, h("th", null, "Submitted"), hasEmail ? h("th", null, "Verified email") : null, qs.map(b => h("th", null, b.label || "Untitled")), h("th", null, ""))),
+        h("tbody", null, rows.map(r => h("tr", null, h("td", { style: { whiteSpace: "nowrap" } }, fmtDate(r.created_at)), hasEmail ? h("td", { style: { whiteSpace: "nowrap" } }, r.respondent_email || "") : null, qs.map(b => h("td", null, cell(r, b))),
           h("td", null, h("button", { class: "icon-btn", "aria-label": "Delete response", onclick: () => confirmSheet("Delete this response?", "It's removed for good.", "Delete", async () => { await store.deleteResponse(r.id); rows = rows.filter(x => x.id !== r.id); draw(); toast("Response deleted"); }) }, icon("trash")))))))));
     }
   }
   function exportCsv() {
     const esc = s => '"' + String(s).replace(/"/g, '""') + '"';
-    const lines = [["Submitted", ...qs.map(b => b.label || "Untitled")].map(esc).join(",")]
-      .concat(rows.map(r => [new Date(r.created_at).toISOString(), ...qs.map(b => val(r, b))].map(esc).join(",")));
+    const lines = [["Submitted", ...(hasEmail ? ["Verified email"] : []), ...qs.map(b => b.label || "Untitled")].map(esc).join(",")]
+      .concat(rows.map(r => [new Date(r.created_at).toISOString(), ...(hasEmail ? [r.respondent_email || ""] : []), ...qs.map(b => val(r, b))].map(esc).join(",")));
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = h("a", { href: URL.createObjectURL(blob), download: (page.title || "responses").replace(/[^\w\- ]+/g, "").trim() + ".csv" });
     document.body.append(a); a.click(); a.remove();
@@ -802,6 +888,7 @@ async function route() {
   try {
     if (kind === "f") return await viewForm(id, false);
     if (store.mode === "cloud" && !user) return viewLogin();
+    if (store.mode === "cloud" && !store.ws) { await store.init(); }
     if (my !== routing) return;
     if (kind === "p" && id) return await viewEditor(id);
     if (kind === "r" && id) return await viewResponses(id);
@@ -825,10 +912,10 @@ async function doInstall() {
   store = await createStore();
   if (store.mode === "cloud") {
     user = await store.getUser();
-    if (user) { try { await store.init(); } catch (e) { toast(e.message); } }
     store.onAuth(async u => {
       const was = !!user; user = u;
-      if (was !== !!u) { if (u) { try { await store.init(); } catch (e) { toast(e.message); } } route(); }
+      if (!u) store.ws = null;
+      if (was !== !!u && !location.hash.startsWith("#f-")) route();
     });
   }
   addEventListener("hashchange", route);

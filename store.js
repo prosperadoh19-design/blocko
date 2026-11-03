@@ -7,7 +7,7 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xx
 }));
 export { uuid };
 
-const PUBLIC_FIELDS = ["id", "title", "description", "emoji", "color", "brand", "blocks", "published", "accepting", "thank_you", "created_at", "updated_at"];
+const PUBLIC_FIELDS = ["id", "title", "description", "emoji", "color", "brand", "access", "one_per_person", "blocks", "published", "accepting", "thank_you", "created_at", "updated_at"];
 const SAVE_FIELDS = [...PUBLIC_FIELDS, "workspace_id"];
 const pick = (p, keys) => Object.fromEntries(keys.filter(k => k in p).map(k => [k, p[k]]));
 const safeName = n => String(n || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").slice(-80);
@@ -19,7 +19,8 @@ class DemoStore {
   constructor() {
     this.mode = "demo"; this.key = "blocko.demo.v1"; this.data = this.load();
     this.data.workspace ||= { id: "demo", name: "My workspace" };
-    this.data.invites ||= []; this.data.alerts ||= {};
+    this.data.invites ||= []; this.data.alerts ||= {}; this.data.secrets ||= {};
+    this.respondent = null; this.pendingCode = null;
     this.ws = this.data.workspace; this.workspaces = [this.ws]; this.role = "owner";
   }
   load() {
@@ -70,10 +71,25 @@ class DemoStore {
   async getAlerts(id) { return this.data.alerts[id] || ""; }
   async setAlerts(id, emails) { this.data.alerts[id] = emails; this.persist(); }
   /* responses */
-  async submitResponse(pageId, answers) {
+  /* who can fill in a form */
+  async getAccessCode(id) { return this.data.secrets[id] || ""; }
+  async setAccessCode(id, code) { this.data.secrets[id] = code; this.persist(); }
+  async checkCode(id, code) { const c = this.data.secrets[id] || ""; return !!c && c.trim().toLowerCase() === String(code).trim().toLowerCase(); }
+  async sendCode(email) { this.pendingCode = { email: email.toLowerCase(), code: String(Math.floor(100000 + Math.random() * 900000)) }; return { demoCode: this.pendingCode.code }; }
+  async verifyCode(email, code) {
+    if (!this.pendingCode || this.pendingCode.email !== email.toLowerCase() || this.pendingCode.code !== String(code).trim()) throw new Error("That code isn't right. Check the latest one and try again.");
+    this.respondent = { email: this.pendingCode.email }; this.pendingCode = null;
+  }
+  async respondentEmail() { return this.respondent ? this.respondent.email : null; }
+  async forgetRespondent() { this.respondent = null; }
+  async submitResponse(pageId, answers, opts = {}) {
     const p = this.data.pages[pageId];
     if (!p || !p.published || !p.accepting) throw new Error("This form isn't accepting responses.");
-    const r = { id: uuid(), page_id: pageId, answers, created_at: new Date().toISOString() };
+    if (p.access === "code" && !(await this.checkCode(pageId, opts.code))) throw new Error("That access code is not right.");
+    if (p.access === "email" && !this.respondent) throw new Error("Please verify your email first.");
+    const email = this.respondent ? this.respondent.email : null;
+    if (p.one_per_person && email && Object.values(this.data.responses).some(r => r.page_id === pageId && r.respondent_email === email)) throw new Error("You have already filled in this form.");
+    const r = { id: uuid(), page_id: pageId, answers, respondent_email: email, created_at: new Date().toISOString() };
     this.data.responses[r.id] = r;
     try { this.persist(); } catch (e) { delete this.data.responses[r.id]; throw e; }
     return r;
@@ -152,10 +168,19 @@ class CloudStore {
   async getAlerts(id) { const r = this.check(await this.sb.from("page_alerts").select("emails").eq("page_id", id).maybeSingle()); return r ? r.emails : ""; }
   async setAlerts(id, emails) { this.check(await this.sb.from("page_alerts").upsert({ page_id: id, emails })); }
   /* responses */
-  async submitResponse(pageId, answers) {
+  async submitResponse(pageId, answers, opts = {}) {
+    if (opts.code != null) { this.check(await this.sb.rpc("submit_with_code", { p_page: pageId, p_answers: answers, p_code: opts.code })); return; }
     // no .select() here: people filling the form are not allowed to read responses back
     this.check(await this.sb.from("responses").insert({ page_id: pageId, answers }));
   }
+  /* who can fill in a form */
+  async getAccessCode(id) { const r = this.check(await this.sb.from("page_secrets").select("access_code").eq("page_id", id).maybeSingle()); return r ? r.access_code : ""; }
+  async setAccessCode(id, code) { this.check(await this.sb.from("page_secrets").upsert({ page_id: id, access_code: code })); }
+  async checkCode(id, code) { return !!this.check(await this.sb.rpc("check_access_code", { p_page: id, p_code: code })); }
+  async sendCode(email) { this.check(await this.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })); return {}; }
+  async verifyCode(email, token) { this.check(await this.sb.auth.verifyOtp({ email, token: String(token).trim(), type: "email" })); }
+  async respondentEmail() { const u = await this.getUser(); return u ? u.email : null; }
+  async forgetRespondent() { await this.sb.auth.signOut(); }
   async listResponses(pageId) { return this.check(await this.sb.from("responses").select("*").eq("page_id", pageId).order("created_at", { ascending: false })); }
   async deleteResponse(id) { this.check(await this.sb.from("responses").delete().eq("id", id)); }
   /* files */
@@ -181,6 +206,8 @@ function friendly(msg) {
   if (/Password should be/i.test(msg)) return "Use a password with at least 6 characters.";
   if (/duplicate key.*invites/i.test(msg)) return "That person is already invited.";
   if (/row-level security/i.test(msg)) return "You don't have permission to do that.";
+  if (/Token has expired|otp.*(invalid|expired)|invalid.*token/i.test(msg)) return "That code isn't right or has expired. Ask for a new one.";
+  if (/rate limit|security purposes.*seconds/i.test(msg)) return "Please wait a minute before asking for another code.";
   if (/exceeded the maximum allowed size|Payload too large/i.test(msg)) return "That file is too big.";
   if (/Failed to fetch|NetworkError/i.test(msg)) return "Can't reach the server. Check your internet connection.";
   return msg;

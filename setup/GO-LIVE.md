@@ -9,6 +9,9 @@
    Leave **Confirm email** turned on: it stops people joining a team with someone else's email.
 6. Left menu → **Project Settings** → **API**. Copy the **Project URL** and the **anon public** key. Send them to Claude, or paste them into `config.js`.
 
+### Email codes for verified forms
+Forms set to **"People who verify their email"** send a 6-digit code. In Supabase → **Authentication** → **Emails** → **Magic Link** template, make sure the email includes `{{ .Token }}` (for example: `Your Blocko code is {{ .Token }}`). Supabase's built-in email sender only allows a few emails per hour; for real use, add your own email sender under **Authentication** → **Emails** → **SMTP Settings** (Resend works well).
+
 ## 2. Connect and upload
 `config.js` should look like this (Claude can do this part for you):
 ```js

@@ -188,3 +188,64 @@ create policy "anyone attaches files to open forms" on storage.objects for inser
 drop policy if exists "team opens attached files" on storage.objects;
 create policy "team opens attached files" on storage.objects for select to authenticated
   using (bucket_id = 'submissions' and exists (select 1 from public.pages p where p.id::text = (storage.foldername(name))[1] and public.is_member(p.workspace_id)));
+
+-------------------------------------------------- who can fill in a form (v4)
+-- access: 'open' (anyone with the link), 'code' (needs the page's access code), 'email' (must verify an email first)
+alter table public.pages add column if not exists access text not null default 'open';
+alter table public.pages add column if not exists one_per_person boolean not null default false;
+do $$ begin
+  alter table public.pages add constraint pages_access_check check (access in ('open', 'code', 'email'));
+exception when duplicate_object then null; end $$;
+alter table public.responses add column if not exists respondent_id uuid;
+alter table public.responses add column if not exists respondent_email text;
+
+-- access codes are kept apart so the public can never read them
+create table if not exists public.page_secrets (
+  page_id uuid primary key references public.pages on delete cascade,
+  access_code text not null default ''
+);
+alter table public.page_secrets enable row level security;
+drop policy if exists "team manages access codes" on public.page_secrets;
+create policy "team manages access codes" on public.page_secrets for all to authenticated
+  using (exists (select 1 from public.pages p where p.id = page_id and public.is_member(p.workspace_id)))
+  with check (exists (select 1 from public.pages p where p.id = page_id and public.is_member(p.workspace_id)));
+
+-- record who answered (from their verified sign-in, never from the form itself) and enforce the page's rules
+create or replace function public.stamp_respondent() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare p pages;
+begin
+  select * into p from pages where id = new.page_id;
+  new.respondent_id := auth.uid();
+  new.respondent_email := lower(nullif(auth.jwt() ->> 'email', ''));
+  if p.access = 'email' and new.respondent_id is null then raise exception 'Please verify your email first.'; end if;
+  if p.one_per_person and new.respondent_id is not null
+     and exists (select 1 from responses r where r.page_id = new.page_id and r.respondent_id = new.respondent_id) then
+    raise exception 'You have already filled in this form.';
+  end if;
+  return new;
+end $$;
+drop trigger if exists stamp_respondent on public.responses;
+create trigger stamp_respondent before insert on public.responses for each row execute function public.stamp_respondent();
+
+drop policy if exists "anyone can answer open pages" on public.responses;
+create policy "anyone can answer open pages" on public.responses for insert to anon, authenticated
+  with check (exists (select 1 from public.pages p where p.id = page_id and p.published and p.accepting
+    and (p.access = 'open' or (p.access = 'email' and auth.uid() is not null))));
+
+create or replace function public.check_access_code(p_page uuid, p_code text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from pages p join page_secrets s on s.page_id = p.id
+    where p.id = p_page and p.published and p.access = 'code' and s.access_code <> ''
+      and lower(btrim(s.access_code)) = lower(btrim(p_code)))
+$$;
+
+create or replace function public.submit_with_code(p_page uuid, p_answers jsonb, p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.check_access_code(p_page, p_code) then raise exception 'That access code is not right.'; end if;
+  if not exists (select 1 from pages where id = p_page and accepting) then raise exception 'This form is not accepting responses.'; end if;
+  insert into responses (page_id, answers) values (p_page, p_answers);
+end $$;
+grant execute on function public.check_access_code(uuid, text) to anon, authenticated;
+grant execute on function public.submit_with_code(uuid, jsonb, text) to anon, authenticated;
