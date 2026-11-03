@@ -7,7 +7,7 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xx
 }));
 export { uuid };
 
-const PUBLIC_FIELDS = ["id", "title", "description", "emoji", "color", "blocks", "published", "accepting", "thank_you", "created_at", "updated_at"];
+const PUBLIC_FIELDS = ["id", "title", "description", "emoji", "color", "brand", "blocks", "published", "accepting", "thank_you", "created_at", "updated_at"];
 const SAVE_FIELDS = [...PUBLIC_FIELDS, "workspace_id"];
 const pick = (p, keys) => Object.fromEntries(keys.filter(k => k in p).map(k => [k, p[k]]));
 const safeName = n => String(n || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").slice(-80);

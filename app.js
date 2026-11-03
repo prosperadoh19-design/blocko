@@ -75,6 +75,43 @@ async function openFile(f) {
   catch (e) { toast(e.message); }
 }
 function fileChip(f) { return h("button", { class: "file-chip", onclick: () => openFile(f), title: "Download " + f.name }, icon("clip"), h("span", null, f.name), h("small", null, fmtSize(f.size || 0))); }
+/* brand images: logo + background image per page */
+function hexA(hex, a) { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return `rgba(20,19,24,${a})`; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+const cssUrl = u => String(u).replace(/["\\\n]/g, c => encodeURIComponent(c));
+function bandStyle(page, forCard) {
+  const b = page.brand || {};
+  if (!b.cover || (b.coverMode === "page" && !forCard)) return { background: b.cover && b.coverMode === "page" ? "transparent" : page.color };
+  const t = b.tint == null ? 0.55 : b.tint;
+  return { backgroundColor: page.color, backgroundImage: `linear-gradient(180deg, ${hexA(page.color, Math.max(0, t - 0.15))}, ${hexA(page.color, Math.min(1, t + 0.2))}), url("${cssUrl(b.cover)}")`, backgroundSize: "cover", backgroundPosition: "center" };
+}
+function applyBand(el, page) { el.removeAttribute("style"); Object.assign(el.style, bandStyle(page)); }
+function pageBg(page) {
+  const b = page.brand || {};
+  if (!b.cover || b.coverMode !== "page") return null;
+  const t = b.tint == null ? 0.55 : b.tint;
+  return h("div", { class: "page-bg", style: { backgroundColor: page.color, backgroundImage: `linear-gradient(180deg, ${hexA(page.color, t)}, ${hexA("#141318", Math.min(1, t + 0.15))}), url("${cssUrl(b.cover)}")` } });
+}
+function markEl(page, cls) {
+  const b = page.brand || {};
+  return b.logo ? h("div", { class: (cls || "emoji-btn") + " has-logo" }, h("img", { src: b.logo, alt: (page.title || "Company") + " logo" })) : h("div", { class: cls || "emoji-btn", style: { background: "rgba(255,255,255,.18)" } }, page.emoji || "📝");
+}
+// shrink pictures before upload so pages load fast and fit in storage
+function compressImage(file, maxDim, keepAlpha) {
+  return new Promise(res => {
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) return res(file);
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, maxDim / Math.max(img.width, img.height));
+      if (k === 1 && file.size < 400 * 1024) { URL.revokeObjectURL(url); return res(file); }
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      const type = keepAlpha ? "image/webp" : "image/jpeg";
+      c.toBlob(b => res(b ? new File([b], file.name.replace(/\.\w+$/, "") + (keepAlpha ? ".webp" : ".jpg"), { type }) : file), type, 0.84);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(file); };
+    img.src = url;
+  });
+}
 function pickFile(accept, onFile) { const i = h("input", { type: "file", accept }); i.onchange = () => { if (i.files[0]) onFile(i.files[0]); }; i.click(); }
 const isQuestion = b => !TYPES[b.type]?.content;
 const Q = (type, label, extra = {}) => ({ id: uuid(), type, label, help: "", required: false, ...(TYPES[type].options ? { options: ["Option 1", "Option 2"] } : {}), ...extra });
@@ -82,6 +119,9 @@ const C = (type, text = "") => ({ id: uuid(), type, text });
 
 const TEMPLATES = {
   blank: { name: "Blank page", emoji: "📝", color: COLORS[0], title: "", description: "", blocks: () => [Q("short", "Your name", { required: true })] },
+  company: { name: "Company form", emoji: "🏢", color: COLORS[7], title: "Your company name", description: "Tell people what this form is for. Add your logo and a background image under Brand.", brand: { coverMode: "header", tint: 0.5 },
+    blocks: () => [C("heading", "Your details"), Q("short", "Full name", { required: true }), Q("email", "Work email", { required: true }), Q("short", "Company"),
+      C("heading", "Your request"), Q("dropdown", "What do you need?", { options: ["A quote", "A demo", "Support", "Something else"] }), Q("long", "Tell us more")] },
   contact: { name: "Contact form", emoji: "💬", color: COLORS[3], title: "Get in touch", description: "Send us a message and we'll reply within one working day.",
     blocks: () => [Q("short", "Full name", { required: true }), Q("email", "Email", { required: true }), Q("phone", "Phone number"), Q("long", "How can we help?", { required: true })] },
   job: { name: "Job application", emoji: "💼", color: COLORS[1], title: "Join our team", description: "Tell us about yourself. It takes about 5 minutes.",
@@ -234,8 +274,8 @@ async function viewHome() {
   const cards = pages.length ? pages.map(p => {
     const st = !p.published ? ["draft", "Draft"] : p.accepting ? ["live", "Live"] : ["closed", "Closed"];
     return h("div", { class: "card" },
-      h("button", { class: "card-top", style: { background: p.color, textAlign: "left" }, onclick: () => go("p-" + p.id) },
-        h("span", { class: "e" }, p.emoji || "📝"), h("h3", null, p.title || "Untitled page")),
+      h("button", { class: "card-top", style: { ...bandStyle(p, true), textAlign: "left" }, onclick: () => go("p-" + p.id) },
+        p.brand && p.brand.logo ? h("span", { class: "card-logo" }, h("img", { src: p.brand.logo, alt: "" })) : h("span", { class: "e" }, p.emoji || "📝"), h("h3", null, p.title || "Untitled page")),
       h("div", { class: "card-bot" },
         h("button", { onclick: () => go("r-" + p.id), style: { display: "flex", alignItems: "baseline", gap: "6px" }, "aria-label": "See responses" }, h("b", null, p.response_count || 0), h("span", { class: "muted" }, (p.response_count === 1 ? "response" : "responses"))),
         h("div", { class: "spacer" }), h("span", { class: "pill " + st[0] }, st[1])),
@@ -307,7 +347,8 @@ function accountSheet() {
 }
 async function newPage(key) {
   const t = TEMPLATES[key];
-  const p = await store.savePage({ id: uuid(), title: t.title, description: t.description, emoji: t.emoji, color: t.color, blocks: t.blocks(), published: false, accepting: true, thank_you: "" });
+  const p = await store.savePage({ id: uuid(), title: t.title, description: t.description, emoji: t.emoji, color: t.color, brand: { ...(t.brand || {}) }, blocks: t.blocks(), published: false, accepting: true, thank_you: "" });
+  if (key === "company") sessionStorage.setItem("blocko.showBrand", p.id);
   go("p-" + p.id);
 }
 
@@ -325,14 +366,21 @@ async function viewEditor(id) {
       catch (e) { state.textContent = "Not saved"; toast(e.message); }
     }, now ? 0 : 700);
   };
-  const band = h("header", { class: "band on-color", style: { background: page.color } });
+  page.brand = page.brand || {};
+  const band = h("header", { class: "band on-color" });
+  applyBand(band, page);
   const countEl = h("span", { class: "count" }, "…");
   const title = h("textarea", { class: "title-input", rows: 1, placeholder: "Untitled page", value: page.title, "aria-label": "Page title", oninput: e => { page.title = e.target.value; autogrow(e.target); save(); } });
   const desc = h("textarea", { class: "desc-input", rows: 1, placeholder: "Add a short description", value: page.description || "", "aria-label": "Description", oninput: e => { page.description = e.target.value; autogrow(e.target); save(); } });
-  const emojiBtn = h("button", { class: "emoji-btn", "aria-label": "Change icon", onclick: () => emojiSheet(e => { page.emoji = e; emojiBtn.textContent = e; save(); }) }, page.emoji || "📝");
+  const emojiBtn = h("button", { class: "emoji-btn", "aria-label": "Change icon or logo", onclick: () => page.brand.logo ? brandBox.scrollIntoView({ behavior: "smooth", block: "center" }) : emojiSheet(e => { page.emoji = e; drawMark(); save(); }) });
+  const drawMark = () => { emojiBtn.classList.toggle("has-logo", !!page.brand.logo); emojiBtn.replaceChildren(page.brand.logo ? h("img", { src: page.brand.logo, alt: "Logo" }) : (page.emoji || "📝")); };
+  drawMark();
+  let bgEl = null;
+  const refreshLook = () => { applyBand(band, page); drawMark(); const nb = pageBg(page); if (bgEl) bgEl.remove(); bgEl = nb; if (bgEl) document.getElementById("app").prepend(bgEl); };
   band.append(h("div", { class: "wrap" },
     topBar(h("div", { style: { display: "flex", alignItems: "center", gap: "4px" } }, h("button", { class: "icon-btn", "aria-label": "Back to home", onclick: () => go("home") }, icon("back")), logo()),
       h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } }, state,
+        h("button", { class: "icon-btn", "aria-label": "Brand images", title: "Logo & background", onclick: () => { brandBox.scrollIntoView({ behavior: "smooth", block: "center" }); brandBox.classList.add("flash"); setTimeout(() => brandBox.classList.remove("flash"), 1400); } }, icon("image")),
         h("button", { class: "icon-btn", "aria-label": "Preview", title: "Preview", onclick: () => go("v-" + page.id) }, icon("eye")),
         h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), "Share"))),
     emojiBtn, title, desc,
@@ -390,7 +438,7 @@ async function viewEditor(id) {
       const up = h("button", { class: "btn dark small", onclick: () => pickFile("image/*", async f => {
         if (!f.type.startsWith("image/")) return toast("Choose a picture file (JPG, PNG, GIF or WebP).");
         up.disabled = true; up.lastChild.textContent = "Uploading…";
-        try { b.url = await store.uploadMedia(f); urlIn.value = ""; drawPrev(); save(); } catch (e) { toast(e.message); }
+        try { b.url = await store.uploadMedia(await compressImage(f, 1600, false)); urlIn.value = ""; drawPrev(); save(); } catch (e) { toast(e.message); }
         up.disabled = false; up.lastChild.textContent = "Upload picture";
       }) }, icon("image"), h("span", null, "Upload picture"));
       drawPrev();
@@ -426,12 +474,14 @@ async function viewEditor(id) {
   }
 
   const colorRow = h("div", { class: "colors" }, COLORS.map(c => h("button", { class: c === page.color ? "on" : "", style: { background: c }, "aria-label": "Color " + c, onclick: e => {
-    page.color = c; band.style.background = c; colorRow.querySelectorAll("button").forEach(x => x.classList.remove("on")); e.currentTarget.classList.add("on"); save();
+    page.color = c; refreshLook(); colorRow.querySelectorAll("button").forEach(x => x.classList.remove("on")); e.currentTarget.classList.add("on"); save();
   } })));
   const thanks = h("textarea", { class: "textarea", style: { minHeight: "80px" }, value: page.thank_you || "", placeholder: "Thanks! We got your answers.", oninput: e => { page.thank_you = e.target.value; save(); } });
+  const brandBox = brandSettings(page, refreshLook, save);
   const side = h("aside", { class: "side-card" },
     h("h3", null, "Page settings"),
     h("div", { class: "field" }, "Color", colorRow),
+    brandBox,
     h("label", { class: "field" }, "Message after someone submits", thanks),
     alertsField(page),
     h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
@@ -440,8 +490,43 @@ async function viewEditor(id) {
   render();
   mount(store.mode === "demo" ? h("div", { class: "demo-bar" }, h("b", null, "Demo mode"), " · Pages and answers stay on this device until the app goes live.") : null,
     band, h("main", { class: "wrap" }, h("div", { class: "edit-layout" }, list, side)));
-  autogrow(title); autogrow(desc);
+  autogrow(title); autogrow(desc); refreshLook();
+  if (sessionStorage.getItem("blocko.showBrand") === page.id) { sessionStorage.removeItem("blocko.showBrand"); setTimeout(() => { brandBox.scrollIntoView({ behavior: "smooth", block: "center" }); brandBox.classList.add("flash"); setTimeout(() => brandBox.classList.remove("flash"), 1600); }, 300); }
   addEventListener("pagehide", () => { if (state.textContent === "Saving…") save(true); }, { once: true });
+}
+
+function brandSettings(page, refresh, save) {
+  const b = page.brand;
+  const box = h("div", { class: "brand-box" });
+  const slot = (label, key, opts) => {
+    const wrap = h("div", { class: "brand-slot" });
+    const draw = () => {
+      const btn = h("button", { class: "btn small dark", onclick: () => pickFile("image/png,image/jpeg,image/webp,image/gif", async f => {
+        if (!f.type.startsWith("image/")) return toast("Choose a picture file (JPG, PNG, WebP or GIF).");
+        btn.disabled = true; btn.lastChild.textContent = "Uploading…";
+        try { b[key] = await store.uploadMedia(await compressImage(f, opts.max, opts.alpha)); refresh(); save(); draw(); toast(label + " added"); }
+        catch (e) { toast(e.message); btn.disabled = false; btn.lastChild.textContent = b[key] ? "Change" : "Upload"; }
+      }) }, icon("image"), h("span", null, b[key] ? "Change" : "Upload"));
+      wrap.replaceChildren(
+        h("div", { class: "brand-thumb " + key }, b[key] ? h("img", { src: b[key], alt: "" }) : h("span", null, opts.empty)),
+        h("div", { class: "brand-acts" }, h("b", null, label), h("small", { class: "muted" }, opts.hint), h("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } }, btn,
+          b[key] ? h("button", { class: "btn small", onclick: () => { delete b[key]; refresh(); save(); draw(); drawMode(); } }, "Remove") : null)));
+      drawMode();
+    };
+    draw(); return wrap;
+  };
+  const modeBox = h("div");
+  const drawMode = () => {
+    if (!b.cover) return modeBox.replaceChildren();
+    const seg = h("div", { class: "seg small" }, [["header", "Header only"], ["page", "Whole page"]].map(([k, l]) => h("button", { class: (b.coverMode || "header") === k ? "on" : "", onclick: () => { b.coverMode = k; refresh(); save(); drawMode(); } }, l)));
+    const tint = h("input", { type: "range", min: 0, max: 0.9, step: 0.05, value: b.tint == null ? 0.55 : b.tint, "aria-label": "Color over the picture", oninput: e => { b.tint = Number(e.target.value); refresh(); save(); } });
+    modeBox.replaceChildren(h("div", { class: "field" }, "Show the background", seg), h("label", { class: "field" }, "Page color over the picture", tint, h("small", { class: "muted", style: { fontWeight: 400 } }, "More color keeps the title easy to read.")));
+  };
+  box.append(h("div", { class: "field" }, "Brand"),
+    slot("Logo", "logo", { max: 512, alpha: true, hint: "Square or wide, PNG with see-through background looks best.", empty: "Logo" }),
+    slot("Background image", "cover", { max: 1800, alpha: false, hint: "A wide photo of your shop, team or product.", empty: "Photo" }),
+    modeBox);
+  return box;
 }
 
 function alertsField(page) {
@@ -475,9 +560,9 @@ async function viewForm(id, preview) {
   document.title = (page.title || "Form") + " · Blocko";
   const answers = {};
   const blockEls = {};
-  const header = h("header", { class: "band on-color", style: { background: page.color } }, h("div", { class: "wrap", style: { maxWidth: "760px" } },
+  const header = h("header", { class: "band on-color" + ((page.brand || {}).coverMode === "page" && (page.brand || {}).cover ? " clear" : ""), style: bandStyle(page) }, h("div", { class: "wrap", style: { maxWidth: "760px" } },
     preview ? topBar(h("button", { class: "btn small light", onclick: () => go("p-" + page.id) }, icon("back"), "Back to editing"), h("span", { class: "save-state" }, "Preview")) : null,
-    h("div", { class: "emoji-btn", style: { background: "rgba(255,255,255,.18)" } }, page.emoji || "📝"),
+    markEl(page),
     h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null));
   const closed = !preview && !page.accepting;
   const body = h("div", { class: "form-page" });
@@ -544,12 +629,12 @@ async function viewForm(id, preview) {
       }
       btn.textContent = "Sending…";
       await store.submitResponse(page.id, out);
-      mount(header, h("div", { class: "form-page" }, h("div", { class: "fblock thanks" }, h("div", { class: "big" }, "🎉"), h("h2", null, "Sent!"),
+      mount(pageBg(page), header, h("div", { class: "form-page" }, h("div", { class: "fblock thanks" }, h("div", { class: "big" }, "🎉"), h("h2", null, "Sent!"),
         h("p", { class: "muted", style: { fontSize: "18px" } }, page.thank_you || "Thanks! We got your answers."),
         h("button", { class: "btn", onclick: () => route() }, "Send another response"))), madeWith());
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
   } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
-  mount(header, form, madeWith());
+  mount(pageBg(page), header, form, madeWith());
 }
 const madeWith = () => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"));
 
@@ -563,10 +648,10 @@ async function viewResponses(id) {
   let mode = "summary";
   const qs = page.blocks.filter(isQuestion);
   const week = rows.filter(r => Date.now() - new Date(r.created_at) < 7 * 864e5).length;
-  const band = h("header", { class: "band on-color", style: { background: page.color } }, h("div", { class: "wrap" },
+  const band = h("header", { class: "band on-color", style: bandStyle({ ...page, brand: { ...(page.brand || {}), coverMode: "header" } }) }, h("div", { class: "wrap" },
     topBar(h("div", { style: { display: "flex", alignItems: "center", gap: "4px" } }, h("button", { class: "icon-btn", "aria-label": "Back to home", onclick: () => go("home") }, icon("back")), logo()),
       h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => store.savePage(pg)) }, icon("share"), "Share")),
-    h("div", { class: "emoji-btn", style: { background: "rgba(255,255,255,.18)" } }, page.emoji || "📝"),
+    markEl(page),
     h("h1", null, page.title || "Untitled page"),
     h("div", { class: "tabs" }, h("button", { onclick: () => go("p-" + page.id) }, "Build"), h("button", { class: "on" }, "Responses", h("span", { class: "count" }, rows.length)))));
   const stats = h("div", { class: "stats" },

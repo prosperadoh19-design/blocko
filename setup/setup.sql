@@ -47,6 +47,7 @@ create table if not exists public.pages (
   description text not null default '',
   emoji text not null default '📝',
   color text not null default '#7b3ff2',
+  brand jsonb not null default '{}',
   blocks jsonb not null default '[]',
   published boolean not null default false,
   accepting boolean not null default true,
@@ -56,6 +57,7 @@ create table if not exists public.pages (
 );
 alter table public.pages add column if not exists workspace_id uuid references public.workspaces on delete cascade;
 alter table public.pages alter column owner drop not null;
+alter table public.pages add column if not exists brand jsonb not null default '{}';
 
 create table if not exists public.responses (
   id uuid primary key default gen_random_uuid(),
