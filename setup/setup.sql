@@ -250,3 +250,31 @@ begin
 end $$;
 grant execute on function public.check_access_code(uuid, text) to anon, authenticated;
 grant execute on function public.submit_with_code(uuid, jsonb, text) to anon, authenticated;
+
+-------------------------------------------------- terms & abuse reports (v5)
+-- who agreed to which version of the Terms of Use, and when
+create table if not exists public.terms_acceptances (
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  version text not null,
+  accepted_at timestamptz not null default now(),
+  primary key (user_id, version)
+);
+alter table public.terms_acceptances enable row level security;
+drop policy if exists "record your own agreement" on public.terms_acceptances;
+create policy "record your own agreement" on public.terms_acceptances for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists "see your own agreements" on public.terms_acceptances;
+create policy "see your own agreements" on public.terms_acceptances for select to authenticated using (user_id = auth.uid());
+
+-- "Report this form": anyone can file a report; only you (in the Supabase dashboard) can read them
+create table if not exists public.reports (
+  id uuid primary key default gen_random_uuid(),
+  page_id uuid references public.pages on delete set null,
+  reason text not null,
+  details text not null default '',
+  reporter_email text,
+  created_at timestamptz not null default now(),
+  constraint report_size check (char_length(details) <= 2000 and char_length(reason) <= 100)
+);
+alter table public.reports enable row level security;
+drop policy if exists "anyone can report a form" on public.reports;
+create policy "anyone can report a form" on public.reports for insert to anon, authenticated with check (true);

@@ -1,4 +1,4 @@
-import { createStore, uuid, LIMITS } from "./store.js";
+import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
 
 /* ============================================================ helpers */
 const $app = document.getElementById("app");
@@ -392,7 +392,20 @@ async function shareSheet(page, onChange) {
       await onChange(page);
       note.textContent = page.published ? (page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.";
     };
-    pub.onchange = sync; acc.onchange = sync;
+    pub.onchange = () => {
+      if (!pub.checked) return sync();
+      pub.checked = false;
+      sheet((b2, close2) => {
+        const cb = h("input", { type: "checkbox", id: "lawful" });
+        const go3 = h("button", { class: "btn brand", disabled: true, onclick: () => { close2(); pub.checked = true; sync(); toast("Published"); } }, "Publish");
+        cb.onchange = () => { go3.disabled = !cb.checked; };
+        b2.append(h("h2", null, "Before you publish"),
+          h("p", { class: "muted", style: { margin: 0 } }, "Once published, anyone with the link can see this form and send you their information."),
+          h("label", { class: "agree-row", for: "lawful" }, cb, h("span", null, "I have the right to collect this information, I'll tell people why I'm collecting it, and I'll use it only for lawful purposes. I understand I am responsible under the laws of my state and country, as set out in the ", h("a", { href: "#terms", target: "_blank" }, "Terms of Use"), ".")),
+          h("div", { class: "row" }, h("button", { class: "btn", onclick: close2 }, "Cancel"), go3));
+      });
+    };
+    acc.onchange = sync;
     const note = h("div", { class: "muted", style: { fontSize: "14px" } }, page.published ? (page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.");
     b.append(
       h("h2", null, "Share"),
@@ -427,6 +440,9 @@ function viewLogin() {
   const sub = h("p", { class: "muted", style: { margin: 0 } }, "Sign in to see your pages and responses.");
   const btn = h("button", { class: "btn brand", type: "submit", style: { height: "54px" } }, "Sign in");
   const swap = h("button", { type: "button", class: "btn ghost" }, "New here? Create an account");
+  const agree = h("input", { type: "checkbox", id: "agree" });
+  const agreeRow = h("label", { class: "agree-row", for: "agree", hidden: true }, agree,
+    h("span", null, "I agree to the ", h("a", { href: "#terms", target: "_blank" }, "Terms of Use"), ". I'm responsible for the information my forms collect and will follow the laws that apply to me."));
   swap.onclick = () => {
     mode = mode === "in" ? "up" : "in";
     title.textContent = mode === "in" ? "Welcome back" : "Create your account";
@@ -434,18 +450,20 @@ function viewLogin() {
     btn.textContent = mode === "in" ? "Sign in" : "Create account";
     swap.textContent = mode === "in" ? "New here? Create an account" : "Have an account? Sign in";
     pw.autocomplete = mode === "in" ? "current-password" : "new-password"; msg.replaceChildren();
+    agreeRow.hidden = mode === "in";
   };
   const form = h("form", { onsubmit: async e => {
     e.preventDefault(); btn.disabled = true; msg.replaceChildren();
     try {
       if (mode === "in") { await store.signIn(email.value.trim(), pw.value); }
       else {
+        if (!agree.checked) { msg.replaceChildren(h("div", { class: "err-box" }, "Please tick the box to agree to the Terms of Use.")); btn.disabled = false; return; }
         const r = await store.signUp(email.value.trim(), pw.value);
         if (r.needsConfirm) { msg.replaceChildren(h("div", { class: "ok-box" }, "Check your inbox and click the link to confirm your email, then sign in.")); swap.click(); }
       }
     } catch (err) { msg.replaceChildren(h("div", { class: "err-box" }, err.message)); }
     btn.disabled = false;
-  } }, title, sub, msg, h("label", { class: "field", for: "em" }, "Email", email), h("label", { class: "field", for: "pw" }, "Password", pw), btn, swap);
+  } }, title, sub, msg, h("label", { class: "field", for: "em" }, "Email", email), h("label", { class: "field", for: "pw" }, "Password", pw), agreeRow, btn, swap);
   const shapes = h("div", { class: "shapes" },
     h("i", { style: { width: "180px", height: "180px", background: "var(--c-orange)", right: "-30px", top: "60px", transform: "rotate(14deg)" } }),
     h("i", { style: { width: "120px", height: "120px", background: "var(--c-yellow)", right: "140px", bottom: "40px", transform: "rotate(-10deg)" } }),
@@ -954,7 +972,7 @@ async function viewForm(id, preview) {
       await store.submitResponse(page.id, out, submitOpts);
       mount(pageBg(page), header, h("div", { class: "form-page" }, h("div", { class: "fblock thanks" }, h("div", { class: "big" }, "🎉"), h("h2", null, "Sent!"),
         h("p", { class: "muted", style: { fontSize: "18px" } }, page.thank_you || "Thanks! We got your answers."),
-        h("button", { class: "btn", onclick: () => route() }, "Send another response"))), madeWith());
+        h("button", { class: "btn", onclick: () => route() }, "Send another response"))), madeWith(page.id));
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
   } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
   const access = page.access || "open";
@@ -965,7 +983,7 @@ async function viewForm(id, preview) {
         ev.currentTarget.disabled = true;
         try { await store.savePage({ ...page, access: "email" }); toast("Sign-in turned on"); route(); } catch (e) { toast(e.message); ev.currentTarget.disabled = false; }
       } }, "Require sign-in")) : null;
-    return mount(pageBg(page), pv, header, form, madeWith());
+    return mount(pageBg(page), pv, header, form, madeWith(preview ? null : page.id));
   }
 
   /* ---- sign-in screen: shown before the questions when the creator turned it on ---- */
@@ -977,7 +995,7 @@ async function viewForm(id, preview) {
       who ? h("span", null, "Signed in as ", h("b", null, who)) : null,
       needCode ? h("span", null, "🔓 Access code accepted") : null,
       who ? h("button", { class: "btn small light", onclick: async () => { await store.forgetRespondent(); route(); } }, "Sign out") : null);
-    mount(pageBg(page), bar, header, form, madeWith());
+    mount(pageBg(page), bar, header, form, madeWith(preview ? null : page.id));
   };
   const next = async () => {
     if (needEmail && !(await store.respondentEmail().catch(() => null))) return drawGate("email");
@@ -1071,7 +1089,24 @@ async function viewForm(id, preview) {
   };
   await next();
 }
-const madeWith = () => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"));
+const madeWith = (pageId) => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"), " · ",
+  h("a", { href: "#terms" }, "Terms"), pageId ? [" · ", h("button", { class: "report-link", onclick: () => reportSheet(pageId) }, "Report this form")] : null);
+function reportSheet(pageId) {
+  sheet((b, close) => {
+    const reason = h("select", { class: "select", id: "rr" }, ["It's a scam or fraud", "It asks for passwords, PINs or bank details", "It pretends to be another company or person", "Harassment or threats", "Illegal goods or activity", "Something else"].map(r => h("option", { value: r }, r)));
+    const details = h("textarea", { class: "textarea", id: "rd", maxLength: 2000, placeholder: "What's wrong with this form? (optional)" });
+    const em = h("input", { class: "input", type: "email", id: "re", placeholder: "Your email, if we may follow up (optional)" });
+    const send = h("button", { class: "btn danger", type: "submit" }, "Send report");
+    b.append(h("h2", null, "Report this form"),
+      h("p", { class: "muted", style: { margin: 0 } }, "If this form looks suspicious, tell us. Don't enter any more of your information into it."),
+      h("form", { style: { display: "grid", gap: "12px" }, onsubmit: async e => {
+        e.preventDefault(); send.disabled = true;
+        try { await store.reportForm(pageId, reason.value, details.value.trim(), em.value.trim()); close(); toast("Thanks, your report has been sent."); }
+        catch (err) { toast(err.message); send.disabled = false; }
+      } }, h("label", { class: "field", for: "rr" }, "What's the problem?", reason), h("label", { class: "field", for: "rd" }, "Details", details), h("label", { class: "field", for: "re" }, "Email", em),
+        h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: close }, "Cancel"), send)));
+  });
+}
 
 /* ============================================================ responses */
 async function viewResponses(id) {
@@ -1153,6 +1188,63 @@ async function viewResponses(id) {
       content));
 }
 
+/* ============================================================ terms */
+function termsBody() {
+  const contact = (window.BLOCKO_CONFIG || {}).contactEmail;
+  const S = (t, ...kids) => h("section", null, h("h2", null, t), ...kids);
+  const P = t => h("p", null, t);
+  const L = items => h("ul", null, items.map(i => h("li", null, i)));
+  return h("article", { class: "terms" },
+    h("p", { class: "terms-date" }, "Version " + TERMS_VERSION + " · Last updated 3 November 2026"),
+    P("These Terms of Use and Acceptable Use Policy are an agreement between you and Blocko. By creating an account, building a page or form, or publishing one, you agree to them. If you use Blocko for a company or organisation, you confirm you're allowed to accept these terms for it."),
+    S("1. You are responsible for the information you collect",
+      P("Blocko is a tool. You decide what your forms ask and what you do with the answers, so you are the one responsible for that information, not Blocko. When you collect people's information you must:"),
+      L(["Have a lawful reason to collect it, and collect only what you actually need.",
+        "Tell people who you are, why you're collecting their information and how you'll use it.",
+        "Get consent where the law requires it, including from a parent or guardian before collecting information about children.",
+        "Keep it safe, share it only where you're allowed to, and delete it when you no longer need it.",
+        "Respond to people who ask to see, correct or delete their information.",
+        "Follow every data protection, privacy, consumer and other law that applies to you and to the people filling in your forms, for example the Nigeria Data Protection Act 2023, the EU General Data Protection Regulation, and the laws of your state and country."])),
+    S("2. What you must never use Blocko for",
+      L(["Scams, fraud, fake giveaways, fake jobs or fake investment schemes.",
+        "Collecting passwords, PINs, one-time codes, card numbers, CVVs or online-banking logins.",
+        "Pretending to be a bank, company, government body, school or any other person or organisation.",
+        "Harassing, threatening, stalking, blackmailing or tracking anyone.",
+        "Collecting information about people without their knowledge, or selling it.",
+        "Selling or arranging illegal goods or services, or anything else that's illegal where you or the people filling in your form are.",
+        "Spreading malware, spam or misleading information."])),
+    S("3. Legal consequences",
+      P("If you use Blocko to collect or use people's information for illegal purposes, you alone are responsible. You may be held liable, civilly and criminally, under the laws of your state and country, and under the laws of any place where the people you collected information from live."),
+      P("You agree to cover any losses, claims, fines or costs that Blocko faces because of how you used the service or broke these terms.")),
+    S("4. What we can do about misuse",
+      L(["Remove or unpublish forms and pages, and delete their content.",
+        "Suspend or close accounts, without notice where the abuse is serious.",
+        "Keep relevant records and share them with law enforcement or regulators when the law requires it or to protect people from harm."])),
+    S("5. Reporting abuse",
+      P("Every public form has a \u201cReport this form\u201d link at the bottom. If a form asks for passwords or bank details, pretends to be someone it isn't, or looks like a scam, please report it and don't enter any more information."),
+      contact ? P("You can also email " + contact + ".") : null),
+    S("6. The service",
+      P("Blocko is provided \u201cas is\u201d. We work to keep it available and secure, but we can't promise it will never have errors or downtime, and we aren't responsible for losses caused by how you use it, to the extent the law allows. We may update these terms; if we make important changes we'll ask you to agree again.")));
+}
+function viewTerms() {
+  document.title = "Terms of Use · Blocko";
+  mount(h("header", { class: "band on-color", style: { background: "var(--c-ink)" } }, h("div", { class: "wrap", style: { maxWidth: "820px" } },
+      topBar(h("div", { style: { display: "flex", gap: "4px", alignItems: "center" } }, h("button", { class: "icon-btn", "aria-label": "Back", onclick: () => history.length > 1 ? history.back() : go("home") }, icon("back")), logo()), null),
+      h("h1", null, "Terms of Use"), h("p", null, "Including our Acceptable Use Policy. Please read them; they protect the people who fill in forms, and they protect you."))),
+    h("main", { class: "wrap", style: { maxWidth: "820px" } }, h("div", { class: "terms-card" }, termsBody())));
+}
+function viewAgree() {
+  const cb = h("input", { type: "checkbox", id: "agree2" });
+  const btn = h("button", { class: "btn brand", disabled: true, style: { height: "54px" } }, "Agree and continue");
+  cb.onchange = () => { btn.disabled = !cb.checked; };
+  btn.onclick = async () => { btn.disabled = true; try { await store.acceptTerms(); route(); } catch (e) { toast(e.message); btn.disabled = false; } };
+  mount(h("header", { class: "band on-color", style: { background: "var(--brand)" } }, h("div", { class: "wrap", style: { maxWidth: "820px" } },
+      topBar(logo(), null), h("h1", null, "One quick thing"), h("p", null, "Before you build forms that collect people's information, please read and agree to our Terms of Use."))),
+    h("main", { class: "wrap", style: { maxWidth: "820px" } }, h("div", { class: "terms-card" }, h("div", { class: "terms-scroll" }, termsBody()),
+      h("label", { class: "agree-row big", for: "agree2" }, cb, h("span", null, "I have read and agree to the Terms of Use. I understand I'm responsible for the information my forms collect, and that I can be held legally responsible under the laws of my state and country if I use Blocko for illegal purposes.")),
+      btn)));
+}
+
 /* ============================================================ router */
 let routing = 0;
 async function route() {
@@ -1163,7 +1255,9 @@ async function route() {
   const [kind, ...rest] = hsh.split("-"); const id = rest.join("-");
   try {
     if (kind === "f") return await viewForm(id, false);
+    if (kind === "terms") return viewTerms();
     if (store.mode === "cloud" && !user) return viewLogin();
+    if (!(await store.termsAccepted())) return viewAgree();
     if (store.mode === "cloud" && !store.ws) { await store.init(); }
     if (my !== routing) return;
     if (kind === "p" && id) return await viewEditor(id);

@@ -12,6 +12,7 @@ const SAVE_FIELDS = [...PUBLIC_FIELDS, "workspace_id"];
 const pick = (p, keys) => Object.fromEntries(keys.filter(k => k in p).map(k => [k, p[k]]));
 const safeName = n => String(n || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").slice(-80);
 const readDataUrl = file => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("Couldn't read that file.")); r.readAsDataURL(file); });
+export const TERMS_VERSION = "2026-11-03";
 export const LIMITS = { image: 5 * 1024 * 1024, file: 10 * 1024 * 1024 };
 
 /* ------------------------------------------------------------------ demo */
@@ -33,6 +34,9 @@ class DemoStore {
   }
   async init() {}
   async getUser() { return { id: "demo", email: "you@demo" }; }
+  async termsAccepted() { return !!(this.data.terms && this.data.terms.version === TERMS_VERSION); }
+  async acceptTerms() { this.data.terms = { version: TERMS_VERSION, at: new Date().toISOString() }; this.persist(); }
+  async reportForm(pageId, reason, details, email) { (this.data.reports ||= []).push({ page_id: pageId, reason, details, email, at: new Date().toISOString() }); this.persist(); }
   onAuth() {}
   async signIn() { return {}; }
   async signUp() { return {}; }
@@ -129,8 +133,19 @@ class CloudStore {
   async getUser() { const { data } = await this.sb.auth.getUser(); return data.user || null; }
   onAuth(cb) { this.sb.auth.onAuthStateChange((_e, session) => cb(session ? session.user : null)); }
   async signIn(email, password) { return this.check(await this.sb.auth.signInWithPassword({ email, password })); }
+  async termsAccepted() {
+    const u = await this.getUser(); return !!(u && u.user_metadata && u.user_metadata.terms_version === TERMS_VERSION);
+  }
+  async acceptTerms() {
+    const at = new Date().toISOString();
+    this.check(await this.sb.auth.updateUser({ data: { terms_version: TERMS_VERSION, terms_accepted_at: at } }));
+    await this.sb.from("terms_acceptances").insert({ version: TERMS_VERSION }); // audit trail; ignore if it already exists
+  }
+  async reportForm(pageId, reason, details, email) {
+    this.check(await this.sb.from("reports").insert({ page_id: pageId, reason, details: (details || "").slice(0, 2000), reporter_email: email || null }));
+  }
   async signUp(email, password) {
-    const data = this.check(await this.sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } }));
+    const data = this.check(await this.sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname, data: { terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() } } }));
     return { needsConfirm: !data.session };
   }
   async signOut() { await this.sb.auth.signOut(); try { localStorage.removeItem("blocko.ws"); } catch (e) {} }
