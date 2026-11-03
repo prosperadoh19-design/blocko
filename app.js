@@ -392,6 +392,7 @@ async function viewEditor(id) {
   const band = h("header", { class: "band on-color" });
   applyBand(band, page);
   const countEl = h("span", { class: "count" }, "…");
+  const lockPill = h("button", { class: "lock-pill", title: "Who can fill this in?", onclick: () => { accessBox.scrollIntoView({ behavior: "smooth", block: "center" }); accessBox.classList.add("flash"); setTimeout(() => accessBox.classList.remove("flash"), 1400); } });
   const title = h("textarea", { class: "title-input", rows: 1, placeholder: "Untitled page", value: page.title, "aria-label": "Page title", oninput: e => { page.title = e.target.value; autogrow(e.target); save(); } });
   const desc = h("textarea", { class: "desc-input", rows: 1, placeholder: "Add a short description", value: page.description || "", "aria-label": "Description", oninput: e => { page.description = e.target.value; autogrow(e.target); save(); } });
   const emojiBtn = h("button", { class: "emoji-btn", "aria-label": "Change icon or logo", onclick: () => page.brand.logo ? brandBox.scrollIntoView({ behavior: "smooth", block: "center" }) : emojiSheet(e => { page.emoji = e; drawMark(); save(); }) });
@@ -402,6 +403,7 @@ async function viewEditor(id) {
   band.append(h("div", { class: "wrap" },
     topBar(h("div", { style: { display: "flex", alignItems: "center", gap: "4px" } }, h("button", { class: "icon-btn", "aria-label": "Back to home", onclick: () => go("home") }, icon("back")), logo()),
       h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } }, state,
+        lockPill,
         h("button", { class: "icon-btn", "aria-label": "Brand images", title: "Logo & background", onclick: () => { brandBox.scrollIntoView({ behavior: "smooth", block: "center" }); brandBox.classList.add("flash"); setTimeout(() => brandBox.classList.remove("flash"), 1400); } }, icon("image")),
         h("button", { class: "icon-btn", "aria-label": "Preview", title: "Preview", onclick: () => go("v-" + page.id) }, icon("eye")),
         h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), "Share"))),
@@ -511,12 +513,20 @@ async function viewEditor(id) {
   } })));
   const thanks = h("textarea", { class: "textarea", style: { minHeight: "80px" }, value: page.thank_you || "", placeholder: "Thanks! We got your answers.", oninput: e => { page.thank_you = e.target.value; save(); } });
   const brandBox = brandSettings(page, refreshLook, save);
+  const accessBox = accessField(page, save, () => drawLock());
+  function drawLock() {
+    const a = page.access || "open";
+    lockPill.className = "lock-pill" + (a === "open" ? "" : " on");
+    lockPill.replaceChildren(svg(a === "open" ? '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>' : '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+      a === "open" ? "Open to anyone" : a === "email" ? "Sign-in: On" : a === "code" ? "Code: On" : "Sign-in + code");
+  }
+  drawLock();
   const side = h("aside", { class: "side-card" },
     h("h3", null, "Page settings"),
     h("div", { class: "field" }, "Color", colorRow),
     brandBox,
     h("label", { class: "field" }, "Message after someone submits", thanks),
-    accessField(page, save),
+    accessBox,
     alertsField(page),
     h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
@@ -571,7 +581,7 @@ function brandSettings(page, refresh, save) {
   return box;
 }
 
-function accessField(page, save) {
+function accessField(page, save, onChange) {
   const box = h("div", { class: "field" }, h("span", { style: { display: "flex", gap: "6px", alignItems: "center" } }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Who can fill this in?"));
   const opts = h("div", { class: "access-opts" });
   const extra = h("div", { style: { display: "grid", gap: "10px" } });
@@ -579,7 +589,7 @@ function accessField(page, save) {
   const setFlags = f => {
     page.access = f.code && f.email ? "both" : f.code ? "code" : f.email ? "email" : "open";
     if (!f.email) page.one_per_person = false;
-    save(); draw();
+    save(); draw(); if (onChange) onChange();
   };
   const draw = () => {
     const f = flags(), open = !f.code && !f.email;
@@ -761,7 +771,15 @@ async function viewForm(id, preview) {
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
   } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
   const access = page.access || "open";
-  if (access === "open" || closed) return mount(pageBg(page), header, form, madeWith());
+  if (access === "open" || closed) {
+    const pv = preview && access === "open" ? h("div", { class: "pv-bar" },
+      h("span", null, "🔓 No sign-in: anyone with the link goes straight to the questions."),
+      h("button", { class: "btn small light", onclick: async ev => {
+        ev.currentTarget.disabled = true;
+        try { await store.savePage({ ...page, access: "email" }); toast("Sign-in turned on"); route(); } catch (e) { toast(e.message); ev.currentTarget.disabled = false; }
+      } }, "Require sign-in")) : null;
+    return mount(pageBg(page), pv, header, form, madeWith());
+  }
 
   /* ---- sign-in screen: shown before the questions when the creator turned it on ---- */
   const needCode = access === "code" || access === "both", needEmail = access === "email" || access === "both";
