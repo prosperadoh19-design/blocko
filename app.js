@@ -49,6 +49,7 @@ function linkify(text) {
 }
 
 /* ============================================================ content model */
+const BACKGROUNDS = [["Sunset", "backgrounds/sunset.jpg"], ["Ocean", "backgrounds/ocean.jpg"], ["City night", "backgrounds/city.jpg"], ["Colors", "backgrounds/colors.jpg"]];
 const COLORS = ["#7b3ff2", "#ff5a1f", "#ff3e9a", "#1f6bff", "#00b86b", "#00a7a7", "#e0a800", "#141318"];
 const EMOJIS = "📝 📋 🎉 💼 🚀 💬 ⭐ 🛒 🎟️ 📅 🍕 ❤️ 🏆 🎨 🎵 📚 💡 🧾 🏠 🧑‍💻 🤝 📣 ✈️ 🌱 ⚽ 🧪 💰 📦 🔔 ✅".split(" ");
 const TYPES = {
@@ -140,7 +141,7 @@ const C = (type, text = "") => ({ id: uuid(), type, text });
 
 const TEMPLATES = {
   blank: { name: "Blank page", emoji: "📝", color: COLORS[0], title: "", description: "", blocks: () => [Q("short", "Your name", { required: true })] },
-  company: { name: "Company form", emoji: "🏢", color: COLORS[7], title: "Your company name", description: "Tell people what this form is for. Add your logo and a background image under Brand.", brand: { coverMode: "header", tint: 0.5 },
+  company: { name: "Company form", emoji: "🏢", color: COLORS[7], title: "Your company name", description: "Tell people what this form is for. Add your logo and a background image under Brand.", brand: { cover: "backgrounds/sunset.jpg", coverMode: "header", tint: 0.35 },
     blocks: () => [C("heading", "Your details"), Q("short", "Full name", { required: true }), Q("email", "Work email", { required: true }), Q("short", "Company"),
       C("heading", "Your request"), Q("dropdown", "What do you need?", { options: ["A quote", "A demo", "Support", "Something else"] }), Q("long", "Tell us more")] },
   contact: { name: "Contact form", emoji: "💬", color: COLORS[3], title: "Get in touch", description: "Send us a message and we'll reply within one working day.",
@@ -555,10 +556,18 @@ function brandSettings(page, refresh, save) {
     const tint = h("input", { type: "range", min: 0, max: 0.9, step: 0.05, value: b.tint == null ? 0.55 : b.tint, "aria-label": "Color over the picture", oninput: e => { b.tint = Number(e.target.value); refresh(); save(); } });
     modeBox.replaceChildren(h("div", { class: "field" }, "Show the background", seg), h("label", { class: "field" }, "Page color over the picture", tint, h("small", { class: "muted", style: { fontWeight: 400 } }, "More color keeps the title easy to read.")));
   };
+  const gallery = h("div", { class: "bg-gallery" });
+  let coverSlot;
+  const drawGallery = () => gallery.replaceChildren(h("small", { class: "muted", style: { gridColumn: "1/-1" } }, "Or pick a ready-made background:"),
+    ...BACKGROUNDS.map(([name, url]) => h("button", { class: "bg-pick" + (b.cover === url ? " on" : ""), type: "button", title: name, "aria-label": "Use the " + name + " background",
+      onclick: () => { b.cover = url; if (b.tint == null) b.tint = 0.35; refresh(); save(); const n = slot("Background image", "cover", coverOpts); coverSlot.replaceWith(n); coverSlot = n; drawGallery(); drawMode(); } },
+      h("img", { src: url, alt: "" }), h("span", null, name))));
+  const coverOpts = { max: 1800, alpha: false, hint: "A wide photo of your shop, team or product.", empty: "Photo" };
+  coverSlot = slot("Background image", "cover", coverOpts);
+  drawGallery();
   box.append(h("div", { class: "field" }, "Brand"),
     slot("Logo", "logo", { max: 512, alpha: true, hint: "Square or wide, PNG with see-through background looks best.", empty: "Logo" }),
-    slot("Background image", "cover", { max: 1800, alpha: false, hint: "A wide photo of your shop, team or product.", empty: "Photo" }),
-    modeBox);
+    coverSlot, gallery, modeBox);
   return box;
 }
 

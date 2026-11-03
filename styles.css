@@ -357,3 +357,10 @@ td .file-chip{max-width:240px}
 .gate-row .btn.ghost{background:transparent;border-color:transparent;color:var(--ink);height:38px}
 .code-in{text-align:center;font-weight:800;letter-spacing:.2em;font-size:20px;text-transform:uppercase}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* v6: ready-made backgrounds */
+.bg-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.bg-pick{display:grid;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);text-align:center}
+.bg-pick img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;border:3px solid transparent;display:block}
+.bg-pick:hover img{border-color:#c9c5d6}
+.bg-pick.on img{border-color:var(--ink)}
+.bg-pick.on span{color:var(--ink)}
