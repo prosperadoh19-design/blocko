@@ -85,8 +85,8 @@ class DemoStore {
   async submitResponse(pageId, answers, opts = {}) {
     const p = this.data.pages[pageId];
     if (!p || !p.published || !p.accepting) throw new Error("This form isn't accepting responses.");
-    if (p.access === "code" && !(await this.checkCode(pageId, opts.code))) throw new Error("That access code is not right.");
-    if (p.access === "email" && !this.respondent) throw new Error("Please verify your email first.");
+    if ((p.access === "code" || p.access === "both") && !(await this.checkCode(pageId, opts.code))) throw new Error("That access code is not right.");
+    if ((p.access === "email" || p.access === "both") && !this.respondent) throw new Error("Please verify your email first.");
     const email = this.respondent ? this.respondent.email : null;
     if (p.one_per_person && email && Object.values(this.data.responses).some(r => r.page_id === pageId && r.respondent_email === email)) throw new Error("You have already filled in this form.");
     const r = { id: uuid(), page_id: pageId, answers, respondent_email: email, created_at: new Date().toISOString() };

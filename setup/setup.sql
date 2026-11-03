@@ -193,8 +193,9 @@ create policy "team opens attached files" on storage.objects for select to authe
 -- access: 'open' (anyone with the link), 'code' (needs the page's access code), 'email' (must verify an email first)
 alter table public.pages add column if not exists access text not null default 'open';
 alter table public.pages add column if not exists one_per_person boolean not null default false;
+alter table public.pages drop constraint if exists pages_access_check;
 do $$ begin
-  alter table public.pages add constraint pages_access_check check (access in ('open', 'code', 'email'));
+  alter table public.pages add constraint pages_access_check check (access in ('open', 'code', 'email', 'both'));
 exception when duplicate_object then null; end $$;
 alter table public.responses add column if not exists respondent_id uuid;
 alter table public.responses add column if not exists respondent_email text;
@@ -218,7 +219,7 @@ begin
   select * into p from pages where id = new.page_id;
   new.respondent_id := auth.uid();
   new.respondent_email := lower(nullif(auth.jwt() ->> 'email', ''));
-  if p.access = 'email' and new.respondent_id is null then raise exception 'Please verify your email first.'; end if;
+  if p.access in ('email', 'both') and new.respondent_id is null then raise exception 'Please verify your email first.'; end if;
   if p.one_per_person and new.respondent_id is not null
      and exists (select 1 from responses r where r.page_id = new.page_id and r.respondent_id = new.respondent_id) then
     raise exception 'You have already filled in this form.';
@@ -236,7 +237,7 @@ create policy "anyone can answer open pages" on public.responses for insert to a
 create or replace function public.check_access_code(p_page uuid, p_code text) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from pages p join page_secrets s on s.page_id = p.id
-    where p.id = p_page and p.published and p.access = 'code' and s.access_code <> ''
+    where p.id = p_page and p.published and p.access in ('code', 'both') and s.access_code <> ''
       and lower(btrim(s.access_code)) = lower(btrim(p_code)))
 $$;
 

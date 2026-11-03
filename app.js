@@ -575,14 +575,23 @@ function accessField(page, save) {
   const box = h("div", { class: "field" }, h("span", { style: { display: "flex", gap: "6px", alignItems: "center" } }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Who can fill this in?"));
   const opts = h("div", { class: "access-opts" });
   const extra = h("div", { style: { display: "grid", gap: "10px" } });
-  const choices = [["open", "Anyone with the link", "No sign-in needed."], ["code", "People with an access code", "You share a code; they type it first."], ["email", "People who sign in", "A login screen first: they sign in with their email and a 6-digit code."]];
+  const flags = () => { const a = page.access || "open"; return { code: a === "code" || a === "both", email: a === "email" || a === "both" }; };
+  const setFlags = f => {
+    page.access = f.code && f.email ? "both" : f.code ? "code" : f.email ? "email" : "open";
+    if (!f.email) page.one_per_person = false;
+    save(); draw();
+  };
   const draw = () => {
-    const cur = page.access || "open";
-    opts.replaceChildren(...choices.map(([k, t, d]) => h("label", { class: "access-opt" + (cur === k ? " on" : "") },
-      h("input", { type: "radio", name: "access-" + page.id, checked: cur === k, onchange: () => { page.access = k; if (k !== "email") page.one_per_person = false; save(); draw(); } }),
-      h("span", null, h("b", null, t), h("small", null, d)))));
+    const f = flags(), open = !f.code && !f.email;
+    const opt = (on, title, desc, onchange, disabledNote) => h("label", { class: "access-opt" + (on ? " on" : "") },
+      h("input", { type: "checkbox", checked: on, onchange }), h("span", null, h("b", null, title), h("small", null, desc)));
+    opts.replaceChildren(
+      opt(open, "Anyone with the link", open ? "On: no sign-in or code needed." : "Off while a lock below is on. Tick to remove the locks.", e => { if (e.target.checked) setFlags({ code: false, email: false }); else { e.target.checked = true; toast("Turn on a lock below instead."); } }),
+      opt(f.code, "People with an access code", "They type a code you share.", e => setFlags({ ...f, code: e.target.checked })),
+      opt(f.email, "People who sign in", "A login screen: email + 6-digit code.", e => setFlags({ ...f, email: e.target.checked })),
+      f.code && f.email ? h("div", { class: "access-both" }, "Both locks on: visitors sign in first, then enter the code.") : null);
     extra.replaceChildren();
-    if (cur === "code") {
+    if (f.code) {
       const inp = h("input", { class: "input", id: "acode", maxLength: 20, placeholder: "e.g. STAFF2026", autocomplete: "off", style: { fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" } });
       const note = h("small", { class: "muted", style: { fontWeight: 400 } }, "Share this code only with the people who should fill in the form.");
       store.getAccessCode(page.id).then(c => { inp.value = c || ""; if (!c) note.textContent = "Set a code so people can open the form."; }).catch(() => {});
@@ -594,7 +603,7 @@ function accessField(page, save) {
       const gen = h("button", { class: "btn small", type: "button", onclick: () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; inp.value = Array.from(crypto.getRandomValues(new Uint8Array(8)), n => a[n % a.length]).join(""); saveCode(inp.value); } }, "Generate");
       extra.append(h("label", { class: "field", for: "acode" }, "Access code", h("div", { style: { display: "flex", gap: "8px" } }, inp, gen), note));
     }
-    if (cur === "email") {
+    if (f.email) {
       extra.append(h("label", { class: "switch" }, h("input", { type: "checkbox", checked: !!page.one_per_person, onchange: e => { page.one_per_person = e.target.checked; save(); } }), "Only one response per person"),
         h("small", { class: "muted", style: { fontWeight: 400 } }, store.mode === "demo" ? "In demo mode the code appears on screen instead of being emailed." : "Their verified email is saved with their answers."));
     }
@@ -755,15 +764,22 @@ async function viewForm(id, preview) {
   if (access === "open" || closed) return mount(pageBg(page), header, form, madeWith());
 
   /* ---- sign-in screen: shown before the questions when the creator turned it on ---- */
+  const needCode = access === "code" || access === "both", needEmail = access === "email" || access === "both";
+  let codeOk = false;
   const unlock = async () => {
-    let bar = null;
-    if (access === "email") {
-      const who = await store.respondentEmail().catch(() => null);
-      if (who) bar = h("div", { class: "signed-bar" }, h("span", null, "Signed in as ", h("b", null, who)),
-        h("button", { class: "btn small light", onclick: async () => { await store.forgetRespondent(); route(); } }, "Sign out"));
-    } else bar = h("div", { class: "signed-bar" }, h("span", null, "🔓 Access code accepted"));
+    const who = needEmail ? await store.respondentEmail().catch(() => null) : null;
+    const bar = h("div", { class: "signed-bar" },
+      who ? h("span", null, "Signed in as ", h("b", null, who)) : null,
+      needCode ? h("span", null, "🔓 Access code accepted") : null,
+      who ? h("button", { class: "btn small light", onclick: async () => { await store.forgetRespondent(); route(); } }, "Sign out") : null);
     mount(pageBg(page), bar, header, form, madeWith());
   };
+  const next = async () => {
+    if (needEmail && !(await store.respondentEmail().catch(() => null))) return drawGate("email");
+    if (needCode && !codeOk) return drawGate("code");
+    return unlock();
+  };
+  const drawGate = async (stage) => {
   const b0 = page.brand || {};
   const art = h("aside", { class: "lg-art", style: b0.cover ? { backgroundColor: page.color, backgroundImage: `linear-gradient(160deg, ${hexA(page.color, 0.55)}, ${hexA("#141318", 0.75)}), url("${cssUrl(b0.cover)}")` } : { background: `linear-gradient(160deg, ${page.color}, ${hexA("#141318", 0.9)})` } },
     preview ? h("button", { class: "btn small light lg-back", onclick: () => go("p-" + page.id) }, icon("back"), "Back to editing") : null,
@@ -776,8 +792,10 @@ async function viewForm(id, preview) {
   showErr("");
   const field = (id, label, input) => h("label", { class: "lg-field", for: id }, h("span", null, label), input);
   const primary = (text) => h("button", { class: "lg-btn", type: "submit", style: { background: page.color } }, text);
+  if (needCode && needEmail) panel.append(h("div", { class: "lg-steps" },
+    h("span", { class: stage === "email" ? "on" : "done" }, stage === "email" ? "1" : "✓", " Sign in"), h("i"), h("span", { class: stage === "code" ? "on" : "" }, "2", " Access code"), h("i"), h("span", null, "3", " Form")));
 
-  if (access === "code") {
+  if (stage === "code") {
     const inp = h("input", { class: "lg-input code-in", id: "gcode", autocomplete: "off", maxLength: 20, placeholder: "e.g. STAFF2026" });
     const go2 = primary("Continue");
     panel.append(h("div", { class: "lg-ic" }, "🔑"), h("h2", null, "Enter access code"), h("p", { class: "lg-sub" }, "This form is private. Enter the code you were given to continue."), msg,
@@ -786,7 +804,7 @@ async function viewForm(id, preview) {
         go2.disabled = true; go2.textContent = "Checking…"; showErr("");
         try {
           const ok = preview ? (await store.getAccessCode(page.id)).toLowerCase() === c.toLowerCase() : await store.checkCode(page.id, c);
-          if (ok) { submitOpts.code = c; return unlock(); }
+          if (ok) { submitOpts.code = c; codeOk = true; return next(); }
           showErr("That code isn't right. Check it and try again.");
         } catch (err) { showErr(err.message); }
         go2.disabled = false; go2.textContent = "Continue";
@@ -796,7 +814,7 @@ async function viewForm(id, preview) {
     const signedIn = await store.respondentEmail().catch(() => null);
     if (signedIn) {
       panel.append(h("div", { class: "lg-ic" }, "👋"), h("h2", null, "Welcome back"), h("p", { class: "lg-sub" }, "You're signed in as ", h("b", null, signedIn), "."), msg,
-        h("div", { class: "lg-form" }, h("button", { class: "lg-btn", style: { background: page.color }, onclick: unlock }, "Continue to the form"),
+        h("div", { class: "lg-form" }, h("button", { class: "lg-btn", style: { background: page.color }, onclick: next }, "Continue"),
           h("button", { class: "lg-link", onclick: async () => { await store.forgetRespondent(); route(); } }, "Not you? Use a different email")));
     } else {
       const em = h("input", { class: "lg-input", type: "email", id: "gem", autocomplete: "email", placeholder: "you@example.com" });
@@ -829,7 +847,7 @@ async function viewForm(id, preview) {
         const f = h("form", { class: "lg-form", onsubmit: async e => {
           e.preventDefault(); if (val().length < 6) return showErr("Enter all 6 digits.");
           ok.disabled = true; ok.textContent = "Checking…"; showErr("");
-          try { await store.verifyCode(email, val()); return unlock(); } catch (err) { showErr(err.message); digits.forEach(d => d.value = ""); digits[0].focus(); }
+          try { await store.verifyCode(email, val()); return next(); } catch (err) { showErr(err.message); digits.forEach(d => d.value = ""); digits[0].focus(); }
           ok.disabled = false; ok.textContent = "Verify and continue";
         } }, h("div", { class: "otp-row" }, digits), ok,
           h("div", { class: "lg-row" }, h("button", { class: "lg-link", type: "button", onclick: () => route() }, "Use a different email"),
@@ -845,6 +863,8 @@ async function viewForm(id, preview) {
   panel.append(h("div", { class: "lg-secure" }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Secured by Blocko"));
   mount(h("div", { class: "lg-wrap" }, art, h("main", { class: "lg-main" }, panel)));
   setTimeout(() => { const f = panel.querySelector("input"); if (f) f.focus(); }, 60);
+  };
+  await next();
 }
 const madeWith = () => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"));
 

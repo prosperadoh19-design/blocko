@@ -408,3 +408,12 @@ td .file-chip{max-width:240px}
   .lg-foot{display:none}
   .lg-main{place-items:start center;padding:28px 22px 40px}
 }
+/* v8: combined locks */
+.access-opt input[type=checkbox]{width:18px;height:18px}
+.access-both{background:#fff4dc;color:#7a4b00;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:600}
+.lg-steps{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--muted);flex-wrap:wrap}
+.lg-steps span{display:inline-flex;align-items:center;gap:6px}
+.lg-steps span::first-letter{font-variant-numeric:tabular-nums}
+.lg-steps span.on{color:var(--ink)}
+.lg-steps span.done{color:var(--ok)}
+.lg-steps i{width:18px;height:2px;background:var(--line);border-radius:1px}
