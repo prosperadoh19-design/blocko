@@ -67,14 +67,35 @@ const TYPES = {
   dropdown: { name: "Dropdown", ic: "▾", c: "#ff5a1f", options: true },
   rating: { name: "Rating", ic: "★", c: "#e0a800" },
   yesno: { name: "Yes / No", ic: "✓", c: "#00b86b" },
-  file: { name: "File upload", ic: "⇪", c: "#141318" }
+  file: { name: "File upload", ic: "⇪", c: "#141318" },
+  imageup: { name: "Image upload", ic: "🖼", c: "#ff3e9a" },
+  docup: { name: "Document upload", ic: "📄", c: "#1f6bff" },
+  time: { name: "Time", ic: "◷", c: "#00a7a7" },
+  datetime: { name: "Date & time", ic: "📆", c: "#00a7a7" },
+  url: { name: "Website link", ic: "🔗", c: "#1f6bff" },
+  address: { name: "Address", ic: "📍", c: "#7b3ff2" },
+  scale: { name: "Scale", ic: "1–10", c: "#e0a800" },
+  signature: { name: "Signature", ic: "✍", c: "#141318" },
+  consent: { name: "Agreement", ic: "☑", c: "#00b86b" }
 };
+const UPLOADS = {
+  file: { accept: "", hint: "Any file", ok: () => true },
+  imageup: { accept: "image/*", hint: "Photos: JPG, PNG, WebP or HEIC", ok: f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name) },
+  docup: { accept: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.odt,.csv", hint: "PDF, Word, Excel, PowerPoint or text", ok: f => /\.(pdf|docx?|xlsx?|pptx?|txt|rtf|odt|csv)$/i.test(f.name) }
+};
+const isUpload = t => t in UPLOADS;
+const isFileVal = v => v && typeof v === "object" && !Array.isArray(v) && v.path;
 const fmtSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
 async function openFile(f) {
   try { const url = await store.fileUrl(f.path); const a = h("a", { href: url, download: f.name, target: "_blank", rel: "noopener" }); document.body.append(a); a.click(); a.remove(); }
   catch (e) { toast(e.message); }
 }
-function fileChip(f) { return h("button", { class: "file-chip", onclick: () => openFile(f), title: "Download " + f.name }, icon("clip"), h("span", null, f.name), h("small", null, fmtSize(f.size || 0))); }
+function fileChip(f) {
+  const isImg = /^image\//.test(f.type || "") || /\.(png|jpe?g|webp|gif|heic)$/i.test(f.name || "");
+  const thumb = h("span", { class: "chip-thumb" }, icon(isImg ? "image" : "clip"));
+  if (isImg) store.fileUrl(f.path).then(u => thumb.replaceChildren(h("img", { src: u, alt: "", loading: "lazy" }))).catch(() => {});
+  return h("button", { class: "file-chip" + (isImg ? " img" : ""), onclick: () => openFile(f), title: "Download " + f.name }, thumb, h("span", null, f.name), h("small", null, fmtSize(f.size || 0)));
+}
 /* brand images: logo + background image per page */
 function hexA(hex, a) { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return `rgba(20,19,24,${a})`; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
 const cssUrl = u => String(u).replace(/["\\\n]/g, c => encodeURIComponent(c));
@@ -401,7 +422,10 @@ async function viewEditor(id) {
         setTimeout(() => { const f = list.querySelector(".block.sel input, .block.sel textarea"); if (f) f.focus(); }, 30);
       } }, h("span", { class: "ic", style: { background: TYPES[k].c } }, TYPES[k].ic), TYPES[k].name)))];
       b.append(h("h2", null, "Add a block"), h("div", { class: "palette" },
-        grp("Questions", ["short", "long", "choice", "checkbox", "dropdown", "rating", "yesno", "email", "phone", "number", "date", "file"]),
+        grp("Text & numbers", ["short", "long", "email", "phone", "number", "url", "address"]),
+        grp("Choices", ["choice", "checkbox", "dropdown", "yesno", "rating", "scale", "consent"]),
+        grp("Dates", ["date", "time", "datetime"]),
+        grp("Uploads & signature", ["imageup", "docup", "file", "signature"]),
         grp("Content", ["heading", "text", "image", "divider"])));
     });
   }
@@ -421,7 +445,10 @@ async function viewEditor(id) {
         if (t.options && b.type !== "dropdown") card.append(h("div", { class: "opts" }, (b.options || []).map(o => h("div", { class: "opt" }, h("i", { class: b.type === "checkbox" ? "sq" : "" }), o))));
         else if (b.type === "rating") card.append(h("div", { class: "fake", style: { fontSize: "22px", letterSpacing: "4px" } }, "★★★★★"));
         else if (b.type === "yesno") card.append(h("div", { class: "fake" }, "Yes  ·  No"));
-        else card.append(h("div", { class: "fake" + (b.type === "long" ? " tall" : "") }, { dropdown: "Choose…", long: "Long answer", email: "name@example.com", phone: "Phone number", number: "0", date: "dd / mm / yyyy", short: "Short answer", file: "⇪  Upload a file (up to 10 MB)" }[b.type]));
+        else if (b.type === "scale") card.append(h("div", { class: "fake" }, Array.from({ length: b.max || 10 }, (_, i) => i + 1).join("  ·  ")), (b.lowLabel || b.highLabel) ? h("div", { class: "help" }, (b.lowLabel || "") + " … " + (b.highLabel || "")) : null);
+        else if (b.type === "consent") card.append(h("div", { class: "opts" }, h("div", { class: "opt" }, h("i", { class: "sq" }), b.label || "I agree")));
+        else card.append(h("div", { class: "fake" + (b.type === "long" || b.type === "signature" || b.type === "address" ? " tall" : "") }, { dropdown: "Choose…", long: "Long answer", email: "name@example.com", phone: "Phone number", number: "0", date: "dd / mm / yyyy", time: "--:--", datetime: "dd / mm / yyyy  --:--", url: "https://…", address: "Street, city, state, country", short: "Short answer", signature: "✍  Sign here",
+          file: "⇪  Upload " + (b.multiple ? "up to 5 files" : "a file") + " (up to 10 MB each)", imageup: "🖼  Upload " + (b.multiple ? "up to 5 photos" : "a photo"), docup: "📄  Upload " + (b.multiple ? "up to 5 documents" : "a document") + " (PDF, Word, Excel…)" }[b.type]));
       }
       return card;
     }
@@ -446,7 +473,7 @@ async function viewEditor(id) {
         h("input", { class: "input", value: b.caption || "", placeholder: "Caption (optional)", "aria-label": "Caption", oninput: e => { b.caption = e.target.value; save(); } }));
     }
     else {
-      g.append(h("input", { class: "input", value: b.label, placeholder: "Type your question", "aria-label": "Question", style: { fontWeight: 700 }, oninput: e => { b.label = e.target.value; save(); } }));
+      g.append(h("input", { class: "input", value: b.label, placeholder: b.type === "consent" ? "I agree to the terms and conditions" : "Type your question", "aria-label": b.type === "consent" ? "Agreement text" : "Question", style: { fontWeight: 700 }, oninput: e => { b.label = e.target.value; save(); } }));
       g.append(h("input", { class: "input", value: b.help || "", placeholder: "Hint below the question (optional)", "aria-label": "Hint", style: { fontSize: "14px" }, oninput: e => { b.help = e.target.value; save(); } }));
       if (t.options) {
         const optsBox = h("div", { class: "edit-grid", style: { gap: "8px" } });
@@ -459,6 +486,11 @@ async function viewEditor(id) {
         };
         drawOpts(); g.append(optsBox);
       }
+      if (isUpload(b.type)) g.append(h("label", { class: "switch" }, h("input", { type: "checkbox", checked: !!b.multiple, onchange: e => { b.multiple = e.target.checked; save(); } }), "Allow up to 5 files"));
+      if (b.type === "scale") g.append(h("div", { class: "scale-edit" },
+        h("label", { class: "field" }, "From 1 to", h("select", { class: "select", onchange: e => { b.max = Number(e.target.value); save(); } }, [5, 10].map(n => h("option", { value: n, selected: (b.max || 10) === n }, n)))),
+        h("label", { class: "field" }, "Label for 1", h("input", { class: "input", value: b.lowLabel || "", placeholder: "Not likely", oninput: e => { b.lowLabel = e.target.value; save(); } })),
+        h("label", { class: "field" }, "Label for " + (b.max || 10), h("input", { class: "input", value: b.highLabel || "", placeholder: "Very likely", oninput: e => { b.highLabel = e.target.value; save(); } }))));
     }
     card.append(g);
     const tools = h("div", { class: "block-tools" });
@@ -577,8 +609,35 @@ async function viewForm(id, preview) {
     const ctrl = h("div", { class: "ctrl" });
     const set = v => { answers[b.id] = v; box.classList.remove("err"); const m = box.querySelector(".msg"); if (m) m.remove(); };
     switch (b.type) {
-      case "short": case "email": case "phone": case "number": case "date":
-        ctrl.append(h("input", { class: "input", id: fid, type: { short: "text", email: "email", phone: "tel", number: "number", date: "date" }[b.type], inputMode: b.type === "phone" ? "tel" : null, autocomplete: b.type === "email" ? "email" : b.type === "phone" ? "tel" : null, maxLength: 500, disabled: closed, oninput: e => set(e.target.value) })); break;
+      case "short": case "email": case "phone": case "number": case "date": case "time": case "datetime": case "url":
+        ctrl.append(h("input", { class: "input", id: fid, type: { short: "text", email: "email", phone: "tel", number: "number", date: "date", time: "time", datetime: "datetime-local", url: "url" }[b.type], placeholder: b.type === "url" ? "https://…" : null,
+          inputMode: b.type === "phone" ? "tel" : b.type === "url" ? "url" : null, autocomplete: b.type === "email" ? "email" : b.type === "phone" ? "tel" : b.type === "url" ? "url" : null, maxLength: 500, disabled: closed,
+          oninput: e => set(e.target.value), onblur: e => { if (b.type === "url" && e.target.value && !/^https?:\/\//i.test(e.target.value)) { e.target.value = "https://" + e.target.value.trim(); set(e.target.value); } } })); break;
+      case "address": ctrl.append(h("textarea", { class: "textarea", id: fid, rows: 3, style: { minHeight: "90px" }, autocomplete: "street-address", placeholder: "Street, city, state, country", maxLength: 1000, disabled: closed, oninput: e => set(e.target.value) })); break;
+      case "scale": {
+        const max = b.max || 10, row = h("div", { class: "scale", role: "radiogroup", "aria-label": b.label });
+        for (let n = 1; n <= max; n++) row.append(h("button", { type: "button", role: "radio", "aria-checked": "false", disabled: closed, onclick: e => { set(n); row.querySelectorAll("button").forEach(x => { x.classList.toggle("on", x === e.currentTarget); x.setAttribute("aria-checked", x === e.currentTarget); }); } }, n));
+        ctrl.append(row);
+        if (b.lowLabel || b.highLabel) ctrl.append(h("div", { class: "scale-labels" }, h("span", null, b.lowLabel || ""), h("span", null, b.highLabel || "")));
+        break;
+      }
+      case "consent":
+        box.querySelector(".ql").remove();
+        ctrl.style.marginTop = "0";
+        ctrl.append(h("label", { class: "choice consent" }, h("input", { type: "checkbox", id: fid, disabled: closed, onchange: e => set(e.target.checked ? "Agreed" : "") }), h("span", null, b.label || "I agree", b.required ? h("span", { style: { color: "var(--danger)" } }, " *") : null)));
+        break;
+      case "signature": {
+        const cv = h("canvas", { class: "sig", width: 1200, height: 360, "aria-label": "Signature pad: draw your signature" });
+        const ctx = cv.getContext("2d"); let drawing = false, drawn = false, last = null;
+        ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141318";
+        const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+        cv.addEventListener("pointerdown", e => { if (closed) return; drawing = true; last = pt(e); cv.setPointerCapture(e.pointerId); e.preventDefault(); });
+        cv.addEventListener("pointermove", e => { if (!drawing) return; const p = pt(e); ctx.beginPath(); ctx.moveTo(...last); ctx.lineTo(...p); ctx.stroke(); last = p; drawn = true; });
+        const end = () => { if (drawing && drawn) set({ __sig: cv }); drawing = false; };
+        cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+        ctrl.append(cv, h("div", { class: "sig-row" }, h("span", { class: "muted" }, "Draw with your finger or mouse"), h("button", { type: "button", class: "btn small", disabled: closed, onclick: () => { ctx.clearRect(0, 0, cv.width, cv.height); drawn = false; set(null); } }, "Clear")));
+        break;
+      }
       case "long": ctrl.append(h("textarea", { class: "textarea", id: fid, maxLength: 5000, disabled: closed, oninput: e => set(e.target.value) })); break;
       case "dropdown": ctrl.append(h("select", { class: "select", id: fid, disabled: closed, onchange: e => set(e.target.value) }, h("option", { value: "" }, "Choose…"), (b.options || []).map(o => h("option", { value: o }, o)))); break;
       case "choice": (b.options || []).forEach(o => ctrl.append(h("label", { class: "choice" }, h("input", { type: "radio", name: fid, value: o, disabled: closed, onchange: () => set(o) }), o))); break;
@@ -588,15 +647,22 @@ async function viewForm(id, preview) {
         for (let n = 1; n <= 5; n++) st.append(h("button", { type: "button", role: "radio", "aria-label": n + " star" + (n > 1 ? "s" : ""), disabled: closed, onclick: () => { set(n); st.querySelectorAll("button").forEach((x, k) => { x.classList.toggle("on", k < n); x.setAttribute("aria-checked", k === n - 1); }); } }, "★"));
         ctrl.append(st); break;
       }
-      case "file": {
-        const chosen = h("div", { class: "muted", style: { fontSize: "14px", marginTop: "8px" } }, "PDF, Word, images and more · up to 10 MB");
-        const inp = h("input", { type: "file", id: fid, class: "file-in", disabled: closed, onchange: e => {
-          const f = e.target.files[0];
-          if (!f) { set(null); chosen.textContent = "PDF, Word, images and more · up to 10 MB"; return; }
-          if (f.size > LIMITS.file) { e.target.value = ""; set(null); chosen.textContent = "That file is " + fmtSize(f.size) + ". Please choose one under 10 MB."; return; }
-          set(f); chosen.textContent = "Selected: " + f.name + " (" + fmtSize(f.size) + ")";
+      case "file": case "imageup": case "docup": {
+        const U = UPLOADS[b.type], many = !!b.multiple;
+        const baseHint = U.hint + " · up to 10 MB" + (many ? " each, 5 files max" : "");
+        const chosen = h("div", { class: "picked" }, h("span", { class: "muted" }, baseHint));
+        const inp = h("input", { type: "file", id: fid, class: "file-in", accept: U.accept || null, multiple: many, disabled: closed, onchange: e => {
+          let files = [...e.target.files];
+          const bad = files.find(f => !U.ok(f)); const big = files.find(f => f.size > LIMITS.file);
+          if (bad) { e.target.value = ""; set(null); chosen.replaceChildren(h("span", { class: "bad" }, bad.name + " isn't allowed here. " + U.hint + " only.")); return; }
+          if (big) { e.target.value = ""; set(null); chosen.replaceChildren(h("span", { class: "bad" }, big.name + " is " + fmtSize(big.size) + ". Each file must be under 10 MB.")); return; }
+          if (many && files.length > 5) { files = files.slice(0, 5); toast("Only the first 5 files were kept."); }
+          if (!files.length) { set(null); chosen.replaceChildren(h("span", { class: "muted" }, baseHint)); return; }
+          set(many ? files : files[0]);
+          chosen.replaceChildren(...files.map(f => h("span", { class: "pick" }, f.type.startsWith("image/") ? h("img", { src: URL.createObjectURL(f), alt: "" }) : icon("clip"), h("span", null, f.name), h("small", null, fmtSize(f.size)))));
         } });
-        ctrl.append(h("label", { class: "file-drop", for: fid }, icon("clip"), h("span", null, "Choose a file")), inp, chosen); break;
+        const word = b.type === "imageup" ? (many ? "Choose photos" : "Choose a photo") : b.type === "docup" ? (many ? "Choose documents" : "Choose a document") : (many ? "Choose files" : "Choose a file");
+        ctrl.append(h("label", { class: "file-drop", for: fid }, icon(b.type === "imageup" ? "image" : "clip"), h("span", null, word)), inp, chosen); break;
       }
       case "yesno": {
         const row = h("div", { class: "yn" });
@@ -617,6 +683,8 @@ async function viewForm(id, preview) {
       if (b.required && empty) msg = "Please answer this question.";
       else if (!empty && b.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = "Enter a valid email, like name@example.com.";
       else if (!empty && b.type === "number" && isNaN(Number(v))) msg = "Enter a number.";
+      else if (!empty && b.type === "url" && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v)) msg = "Enter a full web address, like https://example.com.";
+      else if (b.required && b.type === "consent" && v !== "Agreed") msg = "Please tick the box to continue.";
       box.classList.toggle("err", !!msg); const old = box.querySelector(".msg"); if (old) old.remove();
       if (msg) { box.append(h("div", { class: "msg" }, msg)); first ||= box; }
     }
@@ -624,8 +692,14 @@ async function viewForm(id, preview) {
     btn.disabled = true; btn.textContent = "Sending…";
     try {
       const out = { ...answers };
+      const up = async f => { btn.textContent = "Uploading " + f.name + "…"; return store.uploadSubmission(page.id, f.type.startsWith("image/") ? await compressImage(f, 2400, false) : f); };
       for (const [k, v] of Object.entries(out)) {
-        if (v instanceof File) { btn.textContent = "Uploading " + v.name + "…"; out[k] = await store.uploadSubmission(page.id, v); }
+        if (v instanceof File) out[k] = await up(v);
+        else if (Array.isArray(v) && v.some(x => x instanceof File)) { const arr = []; for (const f of v) arr.push(await up(f)); out[k] = arr; }
+        else if (v && v.__sig) {
+          const blob = await new Promise(r => v.__sig.toBlob(r, "image/png"));
+          out[k] = await up(new File([blob], "signature.png", { type: "image/png" }));
+        }
       }
       btn.textContent = "Sending…";
       await store.submitResponse(page.id, out);
@@ -661,8 +735,10 @@ async function viewResponses(id) {
   const content = h("div");
   const seg = h("div", { class: "seg" });
   const drawSeg = () => seg.replaceChildren(...[["summary", "Summary"], ["table", "All answers"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: () => { mode = k; drawSeg(); draw(); } }, l)));
-  const val = (r, b) => { const v = r.answers ? r.answers[b.id] : undefined; return Array.isArray(v) ? v.join(", ") : v == null ? "" : typeof v === "object" ? (v.name || "") : String(v); };
-  const cell = (r, b) => { const v = r.answers ? r.answers[b.id] : undefined; return v && typeof v === "object" && !Array.isArray(v) && v.path ? fileChip(v) : val(r, b); };
+  const one = v => isFileVal(v) ? v.name : String(v);
+  const val = (r, b) => { const v = r.answers ? r.answers[b.id] : undefined; return v == null ? "" : Array.isArray(v) ? v.map(one).join(", ") : typeof v === "object" ? (v.name || "") : b.type === "datetime" ? String(v).replace("T", " ") : String(v); };
+  const filesOf = v => (Array.isArray(v) ? v : [v]).filter(isFileVal);
+  const cell = (r, b) => { const v = r.answers ? r.answers[b.id] : undefined; const fs = v ? filesOf(v) : []; return fs.length ? h("div", { class: "chips" }, fs.map(fileChip)) : val(r, b); };
   function draw() {
     if (!rows.length) return content.replaceChildren(h("div", { class: "empty" }, h("h3", null, "No responses yet"), h("p", { class: "muted" }, page.published ? "Share your link to start collecting answers." : "Publish your page and share the link to start collecting answers."),
       h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => store.savePage(pg)) }, icon("share"), page.published ? "Share link" : "Publish & share")));
@@ -670,8 +746,9 @@ async function viewResponses(id) {
       content.replaceChildren(h("div", { class: "sum" }, qs.map(b => {
         const vals = rows.map(r => r.answers ? r.answers[b.id] : undefined).filter(v => v != null && v !== "" && !(Array.isArray(v) && !v.length));
         const card = h("div", { class: "sum-card" }, h("h3", null, b.label || "Untitled question"), h("div", { class: "sub" }, vals.length + " of " + rows.length + " answered"));
-        if (["choice", "checkbox", "dropdown", "yesno", "rating"].includes(b.type)) {
-          const keys = b.type === "yesno" ? ["Yes", "No"] : b.type === "rating" ? ["5", "4", "3", "2", "1"] : [...(b.options || [])];
+        if (["choice", "checkbox", "dropdown", "yesno", "rating", "scale", "consent"].includes(b.type)) {
+          const keys = b.type === "yesno" ? ["Yes", "No"] : b.type === "consent" ? ["Agreed"] : b.type === "rating" ? ["5", "4", "3", "2", "1"] : b.type === "scale" ? Array.from({ length: b.max || 10 }, (_, i) => String((b.max || 10) - i)) : [...(b.options || [])];
+          if (b.type === "scale") { const avg = vals.reduce((a, v) => a + Number(v), 0) / (vals.length || 1); card.append(h("div", { class: "big-num" }, avg.toFixed(1), h("span", { class: "muted", style: { fontSize: "18px" } }, " / " + (b.max || 10) + " average"))); }
           const counts = new Map(keys.map(k => [k, 0]));
           vals.flat().forEach(v => { const k = String(v); counts.set(k, (counts.get(k) || 0) + 1); });
           const max = Math.max(1, ...counts.values());
@@ -682,6 +759,8 @@ async function viewResponses(id) {
           const nums = vals.map(Number).filter(n => !isNaN(n));
           const sum = nums.reduce((a, n) => a + n, 0);
           card.append(h("div", { class: "big-num" }, sum.toLocaleString(), h("span", { class: "muted", style: { fontSize: "18px" } }, " total · " + (nums.length ? (sum / nums.length).toFixed(1) : 0) + " average")));
+        } else if (isUpload(b.type) || b.type === "signature") {
+          card.append(h("div", { class: "chips" }, vals.slice(0, 60).flatMap(filesOf).map(fileChip)));
         } else if (b.type === "file") {
           card.append(h("div", { class: "texts" }, vals.slice(0, 50).map(v => h("div", null, v && v.path ? fileChip(v) : String(v)))));
         } else {

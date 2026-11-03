@@ -88,8 +88,8 @@ class DemoStore {
     return readDataUrl(file);
   }
   async uploadSubmission(pageId, file) {
-    if (file.size > 1024 * 1024) throw new Error("In demo mode attached files must be under 1 MB. Bigger ones work once the app is online.");
-    return { path: await readDataUrl(file), name: file.name, size: file.size };
+    if (file.size > 1024 * 1024) throw new Error(`In demo mode attached files must be under 1 MB (${file.name} is bigger). Bigger ones work once the app is online.`);
+    return { path: await readDataUrl(file), name: file.name, size: file.size, type: file.type };
   }
   async fileUrl(path) { return path; }
 }
@@ -169,7 +169,7 @@ class CloudStore {
     if (file.size > LIMITS.file) throw new Error("Files must be under 10 MB.");
     const path = `${pageId}/${uuid()}-${safeName(file.name)}`;
     this.check(await this.sb.storage.from("submissions").upload(path, file, { contentType: file.type || "application/octet-stream" }));
-    return { path, name: file.name, size: file.size };
+    return { path, name: file.name, size: file.size, type: file.type };
   }
   async fileUrl(path) { return this.check(await this.sb.storage.from("submissions").createSignedUrl(path, 3600, { download: true })).signedUrl; }
 }
