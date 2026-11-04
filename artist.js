@@ -13,6 +13,22 @@ function loadAssets() {
   add("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=Syne:wght@700;800&display=swap");
 }
 
+// Section links (#about, #music…) must scroll the page, not change the app's screen.
+const ROUTES = /^#(home|terms|ads|p-|r-|v-|f-)/;
+function sectionLinks(root) {
+  root.addEventListener("click", e => {
+    const a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a || !root.contains(a)) return;
+    const href = a.getAttribute("href");
+    if (ROUTES.test(href)) return; // real app links (Terms, Create your own page) still work
+    e.preventDefault();
+    const el = root.querySelector(href === "#" ? "body" : href) || (href === "#hero" || href === "#top" ? root : null);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const m = root.querySelector(".ar-mmenu"); if (m) m.hidden = true;
+  });
+  return root;
+}
+
 export function artistSite(d, page, preview, topBarEl, main) {
   const { h, store, toast, adSlot, safeUrl, platformOf, galleryEl, fmtTime, mount, upcoming, ytId, videoModal, linkify, reportSheet, go } = d;
   loadAssets();
@@ -245,6 +261,7 @@ export function artistSite(d, page, preview, topBarEl, main) {
     topBarEl ? h("div", { class: "ar-topbar" }, topBarEl) : null,
     preview ? h("div", { class: "ar-preview" }, h("button", { type: "button", onclick: () => go("p-" + page.id) }, "← Back to editing"), h("span", null, "Preview")) : null,
     navEl, hero, parts, foot, player);
+  sectionLinks(root);
   mount(root);
   document.body.classList.add("artist-mode");
   document.documentElement.style.scrollBehavior = "smooth";
@@ -347,5 +364,5 @@ export function aboutSite(d, page, preview, back) {
     h("div", { class: "ar-soc big" }, links.slice(0, 6).map(l => h("a", { href: l.href, target: "_blank", rel: "noopener", "aria-label": l.label || l.plat }, fa(FA[l.plat] || "fa-solid fa-link"))))),
     h("div", { class: "ar-wrap ar-made" }, h("a", { href: location.pathname + "#home" }, "Made with Blocko · Create your own free page →"),
       h("span", null, h("a", { href: "#terms" }, "Terms"), preview ? null : h("button", { type: "button", onclick: () => reportSheet(page.id) }, "Report"))));
-  return h("div", { class: "ar-root" }, navEl, hero, parts, foot);
+  return sectionLinks(h("div", { class: "ar-root" }, navEl, hero, parts, foot));
 }
