@@ -243,3 +243,101 @@ export function artistSite(d, page, preview, topBarEl, main) {
   if (main.querySelector && main.querySelector(".thanks")) setTimeout(() => document.getElementById("contact")?.scrollIntoView({ block: "start" }), 60);
   paint();
 }
+
+// Company "About us" page in the same dark website style.
+export function aboutSite(d, page, preview, back) {
+  const { h, adSlot, safeUrl, platformOf, galleryEl, linkify, reportSheet, go } = d;
+  loadAssets();
+  const fa = (cls, extra = "") => h("i", { class: cls + (extra ? " " + extra : ""), "aria-hidden": "true" });
+  const a = (page.brand || {}).about || {};
+  const name = a.name || page.title || "About us";
+  const cover = (page.brand || {}).cover;
+  const stats = (a.stats || []).filter(x => x.value);
+  const wins = (a.wins || "").split("\n").map(x => x.trim()).filter(Boolean);
+  const slides = a.slides || [];
+  const cats = (a.gallery || []).filter(c => (c.images || []).length);
+  const links = (a.links || []).map(l => ({ ...l, href: l.url && safeUrl(l.url.trim()) })).filter(l => l.href).map(l => ({ ...l, plat: platformOf(l.href) }));
+  const web = a.website && safeUrl(a.website);
+  const paras = (a.story || "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+  const logo = (page.brand || {}).logo;
+  const nav = [];
+  const parts = [];
+  const sec = (id, kicker, title, kids, opts = {}) => h("section", { id, class: "ar-sec" + (opts.alt ? " alt" : "") }, h("div", { class: "ar-wrap" },
+    h("div", { class: "ar-head" + (opts.center ? " center" : "") }, h("div", null, h("span", { class: "ar-kick " + (opts.kc || "cyan") }, kicker), h("h2", null, title), opts.sub ? h("p", null, opts.sub) : null)), kids));
+  const toForm = () => back();
+
+  const hero = h("section", { id: "top", class: "ar-hero ab-hero" },
+    cover ? h("div", { class: "ar-hero-bg", style: { backgroundImage: `url("${cover.replace(/"/g, "%22")}")` } }) : null, h("div", { class: "ar-hero-fade" }), h("div", { class: "ar-grid-bg" }),
+    h("div", { class: "ar-orb a" }), h("div", { class: "ar-orb b" }),
+    h("div", { class: "ar-hero-in" },
+      logo ? h("img", { class: "ab-logo", src: logo, alt: "" }) : null,
+      h("div", { class: "ar-badge" }, h("i", { class: "dot" }), h("span", null, "About us")),
+      h("h1", { class: "ar-name ab-name" }, name),
+      a.tagline ? h("p", { class: "ar-tag" }, a.tagline) : null,
+      h("div", { class: "ar-cta" }, h("button", { class: "ar-btn white", type: "button", onclick: toForm }, fa("fa-solid fa-pen-to-square"), h("span", null, "Fill the form")),
+        (a.email || a.phone || web) ? h("a", { class: "ar-btn glass", href: "#contact" }, fa("fa-solid fa-envelope", "c-cyan"), h("span", null, "Contact us")) : null)));
+
+  if (paras.length || a.photo || stats.length || wins.length) {
+    nav.push(["about", "About"]);
+    parts.push(h("section", { id: "about", class: "ar-sec alt" }, h("div", { class: "ar-wrap" + (a.photo ? " ar-about" : "") },
+      a.photo ? h("div", { class: "ar-photo-card" }, h("div", { class: "ar-photo ab-photo" }, h("img", { src: a.photo, alt: name, loading: "lazy" }), h("div", { class: "fade" })),
+        stats.length ? h("div", { class: "ar-stats" }, stats.map((x, i) => h("div", null, h("p", { class: "k " + ACC[i % 3] }, x.label), h("p", { class: "v" }, x.value)))) : null) : null,
+      h("div", { class: "ar-bio" },
+        h("div", { class: "ar-pill" }, fa("fa-solid fa-building"), h("span", null, "Who we are")),
+        h("h2", null, a.tagline && paras.length ? name : "What we do"),
+        a.address ? h("div", { class: "ar-facts" }, h("span", null, fa("fa-solid fa-location-dot", "c-cyan"), a.address)) : null,
+        paras.map((p, i) => h("p", { class: i ? "p2" : "p1" }, linkify(p))),
+        !a.photo && stats.length ? h("div", { class: "ab-stats" }, stats.map((x, i) => h("div", { class: "ar-card" }, h("p", { class: "k " + ACC[i % 3] }, x.label), h("p", { class: "v" }, x.value)))) : null))));
+  }
+  if (wins.length) {
+    nav.push(["achievements", "Achievements"]);
+    parts.push(sec("achievements", "Track record", "What we've achieved", h("div", { class: "ab-wins" }, wins.map((w, i) => h("div", { class: "ar-card" },
+      fa(["fa-solid fa-award", "fa-solid fa-trophy", "fa-solid fa-circle-check", "fa-solid fa-star", "fa-solid fa-medal", "fa-solid fa-rocket"][i % 6], "c-" + ACC[i % 3]), h("h3", null, w)))), { kc: "purple" }));
+  }
+  if (slides.length) {
+    nav.push(["highlights", "Highlights"]);
+    let cur = 0, timer;
+    const track = h("div", { class: "ab-track" }, slides.map(u => h("div", { class: "ab-slide" }, h("img", { src: u, alt: "", loading: "lazy" }))));
+    const count = h("span", { class: "ab-count" });
+    const paint = () => count.replaceChildren(h("b", null, String(cur + 1).padStart(2, "0")), " / " + String(slides.length).padStart(2, "0"));
+    const goTo = i => { cur = (i + slides.length) % slides.length; track.scrollTo({ left: track.clientWidth * cur, behavior: "smooth" }); paint(); restart(); };
+    const restart = () => { clearInterval(timer); if (slides.length > 1) timer = setInterval(() => { if (!track.isConnected) return clearInterval(timer); goTo(cur + 1); }, 4500); };
+    paint(); restart();
+    parts.push(sec("highlights", "Highlights", "Our work in pictures", h("div", { class: "ab-slides" }, track,
+      slides.length > 1 ? h("div", { class: "ab-ctrl" }, count, h("div", { class: "ab-btns" }, h("button", { type: "button", "aria-label": "Previous", onclick: () => goTo(cur - 1) }, fa("fa-solid fa-chevron-left")), h("button", { type: "button", "aria-label": "Next", onclick: () => goTo(cur + 1) }, fa("fa-solid fa-chevron-right")))) : null), { alt: true, kc: "pink" }));
+  }
+  if (cats.length) {
+    nav.push(["gallery", "Gallery"]);
+    parts.push(sec("gallery", "Gallery", "Photos", h("div", { class: "ar-gallery" }, galleryEl(cats, null)), { kc: "purple" }));
+  }
+  if (links.length) {
+    nav.push(["links", "Links"]);
+    parts.push(sec("links", "Find us online", "Links", h("div", { class: "ab-links" }, links.map((l, i) => h("a", { class: "ar-contact", href: l.href, target: "_blank", rel: "noopener" },
+      h("span", { class: "ic " + ["purple", "cyan"][i % 2] }, fa(FA[l.plat] || "fa-solid fa-link")), h("span", null, h("small", null, l.plat === "Website" ? "Link" : l.plat), h("b", null, l.label || l.href.replace(/^https?:\/\//, "").replace(/\/$/, ""))), fa("fa-solid fa-arrow-up-right-from-square", "ab-out")))), { alt: true, kc: "emerald" }));
+  }
+  parts.push(h("section", { class: "ar-sec ar-ads", "aria-label": "Sponsored" }, h("div", { class: "ar-wrap" }, h("span", { class: "ar-kick" }, "Sponsored"), h("div", { class: "ar-ads-row" }, adSlot(), adSlot()))));
+  const contacts = [
+    web ? ["fa-solid fa-globe", "Website", web.replace(/^https?:\/\//, "").replace(/\/$/, ""), web, "purple"] : null,
+    a.email ? ["fa-solid fa-envelope", "Email", a.email, "mailto:" + a.email, "cyan"] : null,
+    a.phone ? ["fa-solid fa-phone", "Phone / WhatsApp", a.phone, "tel:" + a.phone.replace(/[^\d+]/g, ""), "purple"] : null,
+    a.address ? ["fa-solid fa-location-dot", "Address", a.address, null, "cyan"] : null].filter(Boolean);
+  nav.push(["contact", "Contact"]);
+  parts.push(h("section", { id: "contact", class: "ar-sec" }, h("div", { class: "ar-wrap ar-contact-grid" },
+    h("div", { class: "ar-contact-l" }, h("span", { class: "ar-kick cyan" }, "Get in touch"), h("h2", null, "Work with " + name),
+      h("p", { class: "ar-muted" }, "Have a question or a request? Fill in our form and the team will get back to you."),
+      h("button", { class: "ar-btn grad", type: "button", onclick: toForm, style: { justifySelf: "start" } }, fa("fa-solid fa-pen-to-square"), h("span", null, "Fill the form"))),
+    contacts.length ? h("div", { class: "ab-contacts" }, contacts.map(([ic, k, v, href, c]) => h(href ? "a" : "div", { class: "ar-contact", href, target: href && href.startsWith("http") ? "_blank" : null, rel: href ? "noopener" : null },
+      h("span", { class: "ic " + c }, fa(ic)), h("span", null, h("small", null, k), h("b", null, v))))) : null)));
+
+  const navEl = h("nav", { class: "ar-nav" }, h("div", { class: "ar-wrap ar-nav-in" },
+    h("a", { class: "ar-logo", href: "#top" }, h("span", null, name), h("i")),
+    h("div", { class: "ar-links" }, nav.map(([id, l]) => h("a", { href: "#" + id }, l))),
+    h("div", { class: "ar-nav-r" }, h("button", { class: "ar-btn grad small", type: "button", onclick: toForm }, "← Back to the form")),
+    h("button", { class: "ar-burger", type: "button", "aria-label": "Back to the form", onclick: toForm }, "←")));
+  const foot = h("footer", { class: "ar-foot" }, h("div", { class: "ar-wrap ar-foot-in" },
+    h("div", null, h("b", null, name), h("span", null, "© " + new Date().getFullYear() + " All rights reserved.")),
+    h("div", { class: "ar-soc big" }, links.slice(0, 6).map(l => h("a", { href: l.href, target: "_blank", rel: "noopener", "aria-label": l.label || l.plat }, fa(FA[l.plat] || "fa-solid fa-link"))))),
+    h("div", { class: "ar-wrap ar-made" }, h("a", { href: location.pathname + "#home" }, "Made with Blocko · Create your own free page →"),
+      h("span", null, h("a", { href: "#terms" }, "Terms"), preview ? null : h("button", { type: "button", onclick: () => reportSheet(page.id) }, "Report"))));
+  return h("div", { class: "ar-root" }, navEl, hero, parts, foot);
+}

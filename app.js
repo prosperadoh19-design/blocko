@@ -1,6 +1,6 @@
 import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
 import { phoneField, phoneOk } from "./phone.js";
-import { artistSite as artistSiteImpl } from "./artist.js";
+import { artistSite as artistSiteImpl, aboutSite as aboutSiteImpl } from "./artist.js";
 // never print "null"/"false" when an optional piece of the screen is left out
 for (const m of ["append", "replaceChildren", "prepend"]) { const orig = Element.prototype[m]; Element.prototype[m] = function (...n) { return orig.apply(this, n.filter(x => x != null && x !== false)); }; }
 
@@ -1140,7 +1140,7 @@ async function viewForm(id, preview) {
     if (header.firstChild) header.firstChild.style.maxWidth = "1120px";
     const slot = h("div", { class: "site-main" }, main);
     let tab = "form";
-    const show = t => { tab = t; header.hidden = t === "about"; document.body.classList.toggle("about-mode", t === "about"); slot.replaceChildren(t === "about" ? aboutPage(page, () => show("form")) : main); tabs && tabs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === t)); window.scrollTo(0, 0); };
+    const show = t => { if (t === "about") return showAboutSite(page, preview); tab = t; header.hidden = t === "about"; document.body.classList.toggle("about-mode", t === "about"); slot.replaceChildren(t === "about" ? aboutPage(page, () => show("form")) : main); tabs && tabs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === t)); window.scrollTo(0, 0); };
     const tabs = about ? h("div", { class: "site-tabs", role: "tablist" },
       h("button", { class: "on", "data-t": "form", role: "tab", onclick: () => show("form") }, "Form"),
       h("button", { "data-t": "about", role: "tab", onclick: () => show("about") }, "About us")) : null;
@@ -1445,12 +1445,15 @@ function slideshow(urls) {
     urls.length > 1 ? h("div", { class: "slides-ctrl" }, count, h("div", { class: "slides-prog" }, bar), h("div", { class: "slides-btns" }, arrow(-1, "Previous picture"), arrow(1, "Next picture"))) : null);
 }
 // About page on its own, opened from the sign-in screen
+function showAboutSite(page, preview, onBack) {
+  const app = document.getElementById("app");
+  const prev = [...app.childNodes], y = scrollY;
+  const back = () => { document.body.classList.remove("artist-mode"); if (onBack) return onBack(); app.replaceChildren(...prev); scrollTo(0, y); };
+  app.replaceChildren(aboutSiteImpl({ h, adSlot, safeUrl, platformOf, galleryEl, linkify, reportSheet, go }, page, preview, back));
+  document.body.classList.add("artist-mode"); scrollTo(0, 0);
+}
 function openAboutAlone(page, preview) {
-  const back = () => route();
-  mount(siteNav(page, preview, h("div", { class: "site-tabs" }, h("button", { onclick: back }, "Form"), h("button", { class: "on" }, "About us"))),
-    h("div", { class: "site-body" }, h("div", { class: "site-main" }, aboutPage(page, back)), h("aside", { class: "site-ads", "aria-label": "Sponsored" }, adSlot(), adSlot())),
-    siteFooter(preview ? null : page.id));
-  document.body.classList.add("about-mode");
+  return showAboutSite(page, preview, () => route());
 }
 function aboutTeaser(page, open) {
   const a = page.brand.about;
