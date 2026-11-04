@@ -586,12 +586,22 @@ async function viewEditor(id) {
   let sel = null, saveT = null, responses = null;
   store.listResponses(id).then(r => { responses = r; countEl.textContent = r.length; }).catch(() => {});
   const state = h("span", { class: "save-state" }, "Saved");
+  // One save at a time, always sending the latest version of the page, so an older save can never undo a newer change.
+  let saving = Promise.resolve();
+  const saveNow = () => {
+    clearTimeout(saveT); state.textContent = "Saving…";
+    saving = saving.then(async () => {
+      try {
+        const saved = await store.savePage(structuredClone(page));
+        if (saved) { page.created_at = saved.created_at; page.updated_at = saved.updated_at; }
+        state.textContent = "Saved";
+      } catch (e) { state.textContent = "Not saved"; toast(e.message); throw e; }
+    }).catch(() => {});
+    return saving;
+  };
   const save = (now) => {
     state.textContent = "Saving…"; clearTimeout(saveT);
-    saveT = setTimeout(async () => {
-      try { page = { ...page, ...(await store.savePage(page)) }; state.textContent = "Saved"; }
-      catch (e) { state.textContent = "Not saved"; toast(e.message); }
-    }, now ? 0 : 700);
+    saveT = setTimeout(saveNow, now ? 0 : 700);
   };
   page.brand = page.brand || {};
   const band = h("header", { class: "band on-color" });
@@ -611,7 +621,7 @@ async function viewEditor(id) {
         lockPill,
         h("button", { class: "icon-btn", "aria-label": "Brand images", title: "Logo & background", onclick: () => { brandBox.scrollIntoView({ behavior: "smooth", block: "center" }); brandBox.classList.add("flash"); setTimeout(() => brandBox.classList.remove("flash"), 1400); } }, icon("image")),
         h("button", { class: "icon-btn", "aria-label": "Preview", title: "Preview", onclick: () => go("v-" + page.id) }, icon("eye")),
-        h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), "Share"))),
+        h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => { Object.assign(page, pg); return saveNow(); }) }, icon("share"), "Share"))),
     emojiBtn, title, desc,
     h("div", { class: "tabs" }, h("button", { class: "on" }, "Build"), h("button", { onclick: () => go("r-" + page.id) }, "Responses", countEl))));
 
@@ -733,7 +743,7 @@ async function viewEditor(id) {
     h("label", { class: "field" }, "Message after someone submits", thanks),
     accessBox,
     alertsField(page),
-    h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => { page = pg; return store.savePage(pg); }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
+    h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => { Object.assign(page, pg); return saveNow(); }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
 
   render();
