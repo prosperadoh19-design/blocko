@@ -481,7 +481,7 @@ function emojiSheet(onPick) {
     h("div", { class: "emoji-grid" }, EMOJIS.map(e => h("button", { onclick: () => { onPick(e); close(); } }, e)))));
 }
 function shareUrl(id) { return location.origin + location.pathname + "#f-" + id; }
-async function shareSheet(page, onChange) {
+async function shareSheet(page, onChange, opts = {}) {
   sheet((b, close) => {
     const link = h("input", { class: "input", readOnly: true, value: shareUrl(page.id), "aria-label": "Form link" });
     const pub = h("input", { type: "checkbox", checked: page.published });
@@ -503,6 +503,7 @@ async function shareSheet(page, onChange) {
         page.published = r.published; page.accepting = r.accepting;
       } catch (e) { pub.checked = !!page.published; acc.checked = !!page.accepting; toast("Couldn't update: " + e.message); return; }
       if (onChange) onChange(page);
+      shareArea.hidden = !page.published; pubNow.hidden = !!page.published;
       note.textContent = page.published ? (isStatic ? "Live. Anyone with the link can see your page." : page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.";
     };
     const isStatic = !(page.blocks || []).some(isQuestion);
@@ -521,17 +522,22 @@ async function shareSheet(page, onChange) {
       });
     };
     acc.onchange = sync;
+    const pubNow = h("button", { class: "btn brand", hidden: !!page.published, onclick: () => { pub.checked = true; pub.onchange(); } }, icon("share"), "Publish now");
+    const shareArea = h("div", { style: { display: "grid", gap: "14px" }, hidden: !page.published },
+      h("div", { class: "share-link" }, link, h("button", { class: "btn dark small", onclick: async () => {
+          try { await navigator.clipboard.writeText(link.value); toast("Link copied"); } catch (e) { link.select(); toast("Press Ctrl+C to copy"); }
+        } }, icon("copy"), "Copy")),
+        store.mode === "demo" ? h("div", { class: "muted", style: { fontSize: "14px" } }, "In demo mode this link only works on this device. Once the app is online, it works for anyone.") : null,
+        qrBox);
+    if (!page.published && opts.publish) setTimeout(() => { pub.checked = true; pub.onchange(); }, 60);
     const note = h("div", { class: "muted", style: { fontSize: "14px" } }, page.published ? (isStatic ? "Live. Anyone with the link can see your page." : page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.");
     b.append(
       h("h2", null, "Share"),
       h("div", { style: { display: "grid", gap: "12px" } },
         h("label", { class: "switch" }, pub, "Publish this page"),
         isStatic ? null : h("label", { class: "switch" }, acc, "Accept new responses"), note),
-      h("div", { class: "share-link" }, link, h("button", { class: "btn dark small", onclick: async () => {
-        try { await navigator.clipboard.writeText(link.value); toast("Link copied"); } catch (e) { link.select(); toast("Press Ctrl+C to copy"); }
-      } }, icon("copy"), "Copy")),
-      store.mode === "demo" ? h("div", { class: "muted", style: { fontSize: "14px" } }, "In demo mode this link only works on this device. Once the app is online, it works for anyone.") : null,
-      qrBox,
+      pubNow,
+      shareArea,
       h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { close(); go("f-" + page.id); } }, icon("eye"), isStatic ? "Open page" : "Open form"), h("button", { class: "btn brand", onclick: close }, "Done"))
     );
   });
@@ -872,7 +878,7 @@ async function viewEditor(id) {
     (thanksBox = h("label", { class: "field" }, "Message after someone submits", thanks)),
     accessBox,
     (alertsBox = alertsField(page)),
-    h("button", { class: "btn brand", onclick: () => shareSheet(page, null) }, icon("share"), page.published ? "Share link" : "Publish & share"),
+    h("button", { class: "btn brand", onclick: () => shareSheet(page, null, { publish: true }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
 
   render(); syncStatic(); window.__syncStatic = syncStatic;
@@ -1930,7 +1936,7 @@ async function viewResponses(id) {
   const cell = (r, b) => { const v = r.answers ? r.answers[b.id] : undefined; const fs = v ? filesOf(v) : []; return fs.length ? h("div", { class: "chips" }, fs.map(fileChip)) : val(r, b); };
   function draw() {
     if (!rows.length) return content.replaceChildren(h("div", { class: "empty" }, h("h3", null, "No responses yet"), h("p", { class: "muted" }, page.published ? "Share your link to start collecting answers." : "Publish your page and share the link to start collecting answers."),
-      h("button", { class: "btn brand", onclick: () => shareSheet(page, null) }, icon("share"), page.published ? "Share link" : "Publish & share")));
+      h("button", { class: "btn brand", onclick: () => shareSheet(page, null, { publish: true }) }, icon("share"), page.published ? "Share link" : "Publish & share")));
     if (mode === "summary") {
       content.replaceChildren(h("div", { class: "sum" }, qs.map(b => {
         const vals = rows.map(r => r.answers ? r.answers[b.id] : undefined).filter(v => v != null && v !== "" && !(Array.isArray(v) && !v.length));
