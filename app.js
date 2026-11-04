@@ -1046,12 +1046,12 @@ async function viewForm(id, preview) {
         e.preventDefault(); const v = em.value.trim();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return showErr("Enter a valid email, like name@example.com.");
         send.disabled = true; send.textContent = "Sending code…"; showErr("");
-        try { const r = await store.sendCode(v); showCode(v, r && r.demoCode); }
+        try { const r = await store.sendCode(v, page.id); showCode(v, r && r.demoCode, r && r.link); }
         catch (err) { showErr(err.message); }
         send.disabled = false; send.textContent = "Continue";
       } }, field("gem", "Email address", em), send);
       const head = h("div", { class: "lg-head" }, h("div", { class: "lg-ic" }, "👤"), h("h2", null, "Sign in to continue"), h("p", { class: "lg-sub" }, "Enter your email and we'll send you a 6-digit code. No password needed."));
-      const showCode = (email, demoCode) => {
+      const showCode = (email, demoCode, isLink) => {
         const digits = Array.from({ length: 6 }, (_, i) => h("input", { class: "otp", inputMode: "numeric", autocomplete: i ? "off" : "one-time-code", maxLength: 6, "aria-label": "Digit " + (i + 1) }));
         const ok = primary("Verify and continue");
         const val = () => digits.map(d => d.value).join("");
@@ -1065,7 +1065,9 @@ async function viewForm(id, preview) {
           d.addEventListener("keydown", e => { if (e.key === "Backspace" && !d.value && digits[i - 1]) digits[i - 1].focus(); });
         });
         head.replaceChildren(h("div", { class: "lg-ic" }, "✉️"), h("h2", null, "Check your email"),
-          h("p", { class: "lg-sub" }, "We sent a 6-digit code to ", h("b", null, email), ". It may take a minute; check spam too."),
+          isLink ? h("p", { class: "lg-sub" }, "We sent a sign-in email to ", h("b", null, email), ". Open it and tap ", h("b", null, "Sign in"), ". This form opens, already signed in. It can take a minute; check spam too.")
+            : h("p", { class: "lg-sub" }, "We sent a 6-digit code to ", h("b", null, email), ". It may take a minute; check spam too."),
+          isLink ? h("p", { class: "lg-note" }, "If your email shows a 6-digit code instead, type it here:") : null,
           demoCode ? h("div", { class: "lg-demo" }, "Demo mode, no email sent. Your code is ", h("b", null, demoCode)) : null);
         const f = h("form", { class: "lg-form", onsubmit: async e => {
           e.preventDefault(); if (val().length < 6) return showErr("Enter all 6 digits.");
@@ -1074,7 +1076,7 @@ async function viewForm(id, preview) {
           ok.disabled = false; ok.textContent = "Verify and continue";
         } }, h("div", { class: "otp-row" }, digits), ok,
           h("div", { class: "lg-row" }, h("button", { class: "lg-link", type: "button", onclick: () => route() }, "Use a different email"),
-            h("button", { class: "lg-link", type: "button", onclick: async ev => { ev.target.disabled = true; try { const r = await store.sendCode(email); showCode(email, r && r.demoCode); toast("New code sent"); } catch (err) { showErr(err.message); ev.target.disabled = false; } } }, "Send a new code")));
+            h("button", { class: "lg-link", type: "button", onclick: async ev => { ev.target.disabled = true; try { const r = await store.sendCode(email, page.id); showCode(email, r && r.demoCode, r && r.link); toast("Sent again"); } catch (err) { showErr(err.message); ev.target.disabled = false; } } }, "Send a new code")));
         stepEmail.replaceWith(f); stepEmail.remove();
         panel.querySelectorAll(".lg-form").forEach(x => { if (x !== f) x.remove(); });
         if (!panel.contains(f)) panel.insertBefore(f, panel.querySelector(".lg-note"));
@@ -1282,10 +1284,13 @@ async function doInstall() {
   store = await createStore();
   if (store.mode === "cloud") {
     user = await store.getUser();
+    // arrived from a sign-in email link for a form: go back to that form
+    const formParam = new URLSearchParams(location.search).get("form");
+    if (formParam && /^[0-9a-f-]{36}$/i.test(formParam)) history.replaceState(null, "", location.pathname + "#f-" + formParam);
     store.onAuth(async u => {
       const was = !!user; user = u;
       if (!u) store.ws = null;
-      if (was !== !!u && !location.hash.startsWith("#f-")) route();
+      if (was !== !!u) route(); // also unlocks a form waiting for sign-in (e.g. link opened in another tab)
     });
   }
   addEventListener("hashchange", route);

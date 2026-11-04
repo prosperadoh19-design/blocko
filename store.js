@@ -79,7 +79,7 @@ class DemoStore {
   async getAccessCode(id) { return this.data.secrets[id] || ""; }
   async setAccessCode(id, code) { this.data.secrets[id] = code; this.persist(); }
   async checkCode(id, code) { const c = this.data.secrets[id] || ""; return !!c && c.trim().toLowerCase() === String(code).trim().toLowerCase(); }
-  async sendCode(email) { this.pendingCode = { email: email.toLowerCase(), code: String(Math.floor(100000 + Math.random() * 900000)) }; return { demoCode: this.pendingCode.code }; }
+  async sendCode(email, pageId) { this.pendingCode = { email: email.toLowerCase(), code: String(Math.floor(100000 + Math.random() * 900000)) }; return { demoCode: this.pendingCode.code }; }
   async verifyCode(email, code) {
     if (!this.pendingCode || this.pendingCode.email !== email.toLowerCase() || this.pendingCode.code !== String(code).trim()) throw new Error("That code isn't right. Check the latest one and try again.");
     this.respondent = { email: this.pendingCode.email }; this.pendingCode = null;
@@ -192,7 +192,7 @@ class CloudStore {
   async getAccessCode(id) { const r = this.check(await this.sb.from("page_secrets").select("access_code").eq("page_id", id).maybeSingle()); return r ? r.access_code : ""; }
   async setAccessCode(id, code) { this.check(await this.sb.from("page_secrets").upsert({ page_id: id, access_code: code })); }
   async checkCode(id, code) { return !!this.check(await this.sb.rpc("check_access_code", { p_page: id, p_code: code })); }
-  async sendCode(email) { this.check(await this.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })); return {}; }
+  async sendCode(email, pageId) { this.check(await this.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname + (pageId ? "?form=" + pageId : "") } })); return { link: true }; }
   async verifyCode(email, token) { this.check(await this.sb.auth.verifyOtp({ email, token: String(token).trim(), type: "email" })); }
   async respondentEmail() { const u = await this.getUser(); return u ? u.email : null; }
   async forgetRespondent() { await this.sb.auth.signOut(); }
