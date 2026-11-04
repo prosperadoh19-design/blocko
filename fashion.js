@@ -1,6 +1,19 @@
 // "Fashion house" page style: a black-and-gold luxury brand site built from the page's blocks.
 import { sectionLinks } from "./artist.js";
 
+// prices: brands type a number; the lookbook's currency adds the symbol
+export const CURRENCIES = [["NGN", "₦", "Naira"], ["USD", "$", "US dollar"], ["GBP", "£", "Pound"], ["EUR", "€", "Euro"], ["GHS", "GH₵", "Cedi"], ["KES", "KSh", "Kenyan shilling"],
+  ["ZAR", "R", "Rand"], ["XOF", "CFA", "CFA franc"], ["CAD", "CA$", "Canadian dollar"], ["AED", "AED", "Dirham"]];
+export function fmtPrice(price, currency) {
+  const raw = String(price || "").trim();
+  if (!raw) return "";
+  const sym = (CURRENCIES.find(c => c[0] === (currency || "NGN")) || CURRENCIES[0])[1];
+  const bare = raw.replace(/^(₦|\$|£|€|GH₵|KSh|CFA|CA\$|AED|R|NGN|USD|GBP|EUR|GHS|KES|ZAR|XOF|CAD)\s*/i, "").trim();
+  if (!/^\d[\d,]*(\.\d+)?$/.test(bare)) return raw; // e.g. "From ₦50,000" or "On request" stays as typed
+  const n = Number(bare.replace(/,/g, ""));
+  return (sym.length > 1 && /[A-Za-z]$/.test(sym) ? sym + " " : sym) + n.toLocaleString("en", { maximumFractionDigits: 2 });
+}
+
 const FA = { Instagram: "fa-brands fa-instagram", TikTok: "fa-brands fa-tiktok", Facebook: "fa-brands fa-facebook", "X (Twitter)": "fa-brands fa-x-twitter", YouTube: "fa-brands fa-youtube",
   Pinterest: "fa-brands fa-pinterest", LinkedIn: "fa-brands fa-linkedin", WhatsApp: "fa-brands fa-whatsapp", Snapchat: "fa-brands fa-snapchat", Threads: "fa-brands fa-threads", Website: "fa-solid fa-globe" };
 
@@ -22,7 +35,7 @@ export function fashionSite(d, page, preview, topBarEl, main) {
   const cover = (page.brand || {}).cover || "backgrounds/silk.jpg";
   const logo = (page.brand || {}).logo;
   const links = all("links").flatMap(b => b.items || []).map(l => ({ ...l, href: l.url && safeUrl(l.url) })).filter(l => l.href).map(l => ({ ...l, plat: l.label && FA[l.label] ? l.label : platformOf(l.href) }));
-  const looks = all("lookbook").flatMap(b => b.items || []).filter(x => x.img);
+  const looks = all("lookbook").flatMap(b => (b.items || []).map(x => ({ ...x, price: fmtPrice(x.price, b.currency) }))).filter(x => x.img);
   const imgs = all("gallery").flatMap(g => g.images || []);
   const vids = all("video").flatMap(v => (v.items || []).filter(x => ytId(x.url)));
   const phone = (m.phone || "").replace(/[^\d+]/g, "");

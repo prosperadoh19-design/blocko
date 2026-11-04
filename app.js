@@ -1,7 +1,7 @@
 import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
 import { phoneField, phoneOk } from "./phone.js";
 import { artistSite as artistSiteImpl, aboutSite as aboutSiteImpl } from "./artist.js";
-import { fashionSite as fashionSiteImpl } from "./fashion.js";
+import { fashionSite as fashionSiteImpl, fmtPrice, CURRENCIES } from "./fashion.js";
 // never print "null"/"false" when an optional piece of the screen is left out
 for (const m of ["append", "replaceChildren", "prepend"]) { const orig = Element.prototype[m]; Element.prototype[m] = function (...n) { return orig.apply(this, n.filter(x => x != null && x !== false)); }; }
 
@@ -421,14 +421,14 @@ const TEMPLATES = {
           press: "Lagos Fashion Week, GTCO Fashion Weekend, Arise Fashion Week",
           boutiques: [{ city: "Lekki, Lagos", address: "Your boutique address", hours: "Mon–Sat 10am – 7pm" }],
           appointments: "Private fittings by appointment. Custom orders take 2–3 weeks.", email: "hello@yourbrand.com", phone: "+234 8000000000" },
-        { ...SHOW.lookbook.make(), heading: "The collections", items: [
-          ["redGown", "Red silk evening gown", "₦450,000", "Evening", "Flowing red silk with a fitted bodice."],
-          ["bridal", "Lace bridal gown", "₦1,200,000", "Bridal", "Ivory lace with a long train, made to measure."],
-          ["printMaxi", "Print maxi dress", "₦180,000", "Ready-to-wear", "Bold African print, cut for movement."],
-          ["headwrap", "Print set with head wrap", "₦150,000", "Ready-to-wear", "Matching print top, skirt and gele."],
-          ["purpleGown", "Embellished evening gown", "₦680,000", "Evening", "Hand-beaded floral appliqué on tulle."],
-          ["dashiki", "Embroidered dashiki", "₦95,000", "Men", "Printed cotton with embroidered neckline."],
-          ["blueSuit", "Tailored blue suit", "₦420,000", "Men", "Two-piece suit, tailored to your measurements."]
+        { ...SHOW.lookbook.make(), heading: "The collections", currency: "NGN", items: [
+          ["redGown", "Red silk evening gown", "450000", "Evening", "Flowing red silk with a fitted bodice."],
+          ["bridal", "Lace bridal gown", "1200000", "Bridal", "Ivory lace with a long train, made to measure."],
+          ["printMaxi", "Print maxi dress", "180000", "Ready-to-wear", "Bold African print, cut for movement."],
+          ["headwrap", "Print set with head wrap", "150000", "Ready-to-wear", "Matching print top, skirt and gele."],
+          ["purpleGown", "Embellished evening gown", "680000", "Evening", "Hand-beaded floral appliqué on tulle."],
+          ["dashiki", "Embroidered dashiki", "95000", "Men", "Printed cotton with embroidered neckline."],
+          ["blueSuit", "Tailored blue suit", "420000", "Men", "Two-piece suit, tailored to your measurements."]
         ].map(([k, title, price, collection, desc]) => ({ img: F(k, 900, 1200), title, price, collection, desc, url: "" })) },
         { ...SHOW.gallery.make(), heading: "Runway & campaign", images: ["runway", "show", "yellowWall", "sketches", "rack"].map(k => F(k, 1600)) },
         SHOW.video.make(),
@@ -1905,6 +1905,16 @@ function artistSite(page, preview, topBarEl, main) {
   return artistSiteImpl({ h, store, toast, adSlot, safeUrl, platformOf, galleryEl, fmtTime, mount, upcoming, ytId, videoModal, linkify, reportSheet, go, isQuestion }, page, preview, topBarEl, main);
 }
 /* ---- fashion: brand profile + lookbook ---- */
+const curSym = c => (CURRENCIES.find(x => x[0] === (c || "NGN")) || CURRENCIES[0])[1];
+const priceBare = p => String(p || "").replace(/^(₦|\$|£|€|GH₵|KSh|CFA|CA\$|AED|R|NGN|USD|GBP|EUR|GHS|KES|ZAR|XOF|CAD)\s*/i, "").trim();
+function priceField(it, b, save) {
+  const hint = h("small", { class: "muted price-hint" });
+  const show = () => { hint.textContent = it.price ? "Shows as " + fmtPrice(it.price, b.currency) : ""; };
+  const el = h("div", { class: "price-wrap" }, h("div", { class: "price-in" }, h("span", { class: "price-sym" }, curSym(b.currency)),
+    h("input", { class: "input", value: priceBare(it.price), placeholder: "e.g. 350000", maxLength: 30, inputMode: "decimal", "aria-label": "Price",
+      oninput: e => { it.price = e.target.value.trim(); save(); show(); } })), hint);
+  show(); return el;
+}
 const photoSlot = (obj, key, label, hint, save, max = 1400) => {
   const wrap = h("div", { class: "brand-slot" });
   const draw = () => {
@@ -1947,7 +1957,7 @@ Object.assign(SHOW, {
     }
   },
   lookbook: {
-    make: () => ({ id: uuid(), type: "lookbook", heading: "", items: [] }),
+    make: () => ({ id: uuid(), type: "lookbook", heading: "", currency: "NGN", items: [] }),
     preview: b => (b.items || []).length ? h("div", { class: "slide-thumbs" }, b.items.slice(0, 8).map(it => h("div", { class: "slide-thumb" }, it.img ? h("img", { src: it.img, alt: "" }) : null)), b.items.length > 8 ? h("span", { class: "muted" }, "+" + (b.items.length - 8)) : null) : h("span", { class: "muted" }, "No looks yet"),
     edit(b, g, save) {
       const box = h("div", { class: "edit-grid", style: { gap: "10px" } });
@@ -1971,7 +1981,7 @@ Object.assign(SHOW, {
           h("div", { class: "wk-ed-top" }, h("button", { class: "wk-pic tall", type: "button", title: "Change photo", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => { try { it.img = await store.uploadMedia(await compressImage(f, 1400, false)); save(); draw(); } catch (e) { toast(e.message); } }) },
               it.img ? [h("img", { src: it.img, alt: "" }), h("span", { class: "pic-change" }, "Change")] : h("span", null, "+ Photo")),
             h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "Look name, e.g. Silk evening gown", save),
-              h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, fld(it, "price", "Price, e.g. ₦350,000", save, { max: 30 }),
+              h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, priceField(it, b, save),
                 h("input", { class: "input", value: it.collection || "", placeholder: "Collection, e.g. Bridal", maxLength: 40, list: "cols-" + b.id, "aria-label": "Collection", oninput: e => { it.collection = e.target.value; save(); }, onchange: () => draw() })),
               fld(it, "desc", "Details: fabric, colours, sizes (optional)", save, { max: 240 }),
               fld(it, "url", "Shop link (optional, https://…)", save, { type: "url", max: 300 }))),
@@ -1981,12 +1991,14 @@ Object.assign(SHOW, {
           list.length < MAX ? h("div", null, addMany) : "", h("small", { class: "muted" }, list.length + " / " + MAX + " looks. Use the same collection name to group looks (e.g. Bridal, Ready-to-wear, Men)."));
       };
       draw();
-      g.append(scHeadingInput(b, "The collections", save), box);
+      const cur = h("div", { class: "field" }, "Currency for all prices", tickGroup(CURRENCIES.map(([k, sy, n]) => [k, sy + " " + n]), b.currency || "NGN", k => { b.currency = k; save(); draw(); }, "Currency"),
+        h("small", { class: "muted", style: { fontWeight: 400 } }, "Type just the number for each look. Typed words like \"On request\" stay as you write them."));
+      g.append(scHeadingInput(b, "The collections", save), cur, box);
     },
     view(b) {
       const items = (b.items || []).filter(x => x.img);
       if (!items.length) return null;
-      return h("section", { class: "fblock sc" }, scLabel(b, "Lookbook"), h("div", { class: "vd-grid" }, items.map(x => h("div", { class: "vd" }, h("span", { class: "vd-thumb" }, h("img", { src: x.img, alt: x.title || "", loading: "lazy" })), h("b", null, x.title || ""), x.price ? h("small", { class: "muted" }, x.price) : null))));
+      return h("section", { class: "fblock sc" }, scLabel(b, "Lookbook"), h("div", { class: "vd-grid" }, items.map(x => h("div", { class: "vd" }, h("span", { class: "vd-thumb" }, h("img", { src: x.img, alt: x.title || "", loading: "lazy" })), h("b", null, x.title || ""), x.price ? h("small", { class: "muted" }, fmtPrice(x.price, b.currency)) : null))));
     }
   }
 });

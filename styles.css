@@ -777,3 +777,8 @@ body.about-mode .about-teaser{display:none}
 .bg-gallery{max-height:330px;overflow-y:auto;padding-right:4px}
 .layout-seg{display:grid;grid-template-columns:1fr;border-radius:14px;gap:2px}
 .layout-seg button{border-radius:10px;justify-content:flex-start;text-align:left;padding:0 14px}
+.price-wrap{display:grid;gap:4px}
+.price-in{display:flex;align-items:stretch}
+.price-sym{display:grid;place-items:center;min-width:46px;padding:0 10px;border:1px solid var(--line);border-right:0;border-radius:12px 0 0 12px;background:var(--paper);font-weight:700}
+.price-in .input{border-radius:0 12px 12px 0}
+.price-hint{font-size:12px}
