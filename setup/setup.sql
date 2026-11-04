@@ -325,3 +325,26 @@ language sql security definer set search_path = public as $$
   where id = p_ad and active;
 $$;
 grant execute on function public.ad_event(uuid, text) to anon, authenticated;
+
+-------------------------------------------------- music on artist pages (v7)
+-- audio: private bucket. Team members upload songs; listeners only get links that expire after 1 hour.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('audio', 'audio', false, 26214400, array['audio/mpeg','audio/mp3','audio/mp4','audio/x-m4a','audio/aac','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/flac'])
+  on conflict (id) do nothing;
+do $$ begin if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='team uploads audio') then
+create policy "team uploads audio" on storage.objects for insert to authenticated
+  with check (bucket_id = 'audio' and exists (select 1 from public.members m where m.workspace_id::text = (storage.foldername(name))[1] and m.user_id = auth.uid()));
+end if; end $$;
+do $$ begin if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='team removes audio') then
+create policy "team removes audio" on storage.objects for delete to authenticated
+  using (bucket_id = 'audio' and exists (select 1 from public.members m where m.workspace_id::text = (storage.foldername(name))[1] and m.user_id = auth.uid()));
+end if; end $$;
+-- listeners can make a short-lived play link for a song in a workspace that has a published page
+do $$ begin if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='listeners stream audio') then
+create policy "listeners stream audio" on storage.objects for select to anon, authenticated
+  using (bucket_id = 'audio' and exists (select 1 from public.pages p where p.workspace_id::text = (storage.foldername(name))[1] and p.published));
+end if; end $$;
+do $$ begin if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='team reads audio') then
+create policy "team reads audio" on storage.objects for select to authenticated
+  using (bucket_id = 'audio' and exists (select 1 from public.members m where m.workspace_id::text = (storage.foldername(name))[1] and m.user_id = auth.uid()));
+end if; end $$;

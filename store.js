@@ -13,7 +13,7 @@ const pick = (p, keys) => Object.fromEntries(keys.filter(k => k in p).map(k => [
 const safeName = n => String(n || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").slice(-80);
 const readDataUrl = file => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("Couldn't read that file.")); r.readAsDataURL(file); });
 export const TERMS_VERSION = "2026-11-03";
-export const LIMITS = { image: 5 * 1024 * 1024, file: 10 * 1024 * 1024 };
+export const LIMITS = { image: 5 * 1024 * 1024, file: 10 * 1024 * 1024, audio: 25 * 1024 * 1024 };
 
 /* ------------------------------------------------------------------ demo */
 class DemoStore {
@@ -123,6 +123,11 @@ class DemoStore {
     return { path: await readDataUrl(file), name: file.name, size: file.size, type: file.type };
   }
   async fileUrl(path) { return path; }
+  async uploadAudio(file) {
+    if (file.size > 3 * 1024 * 1024) throw new Error("In demo mode songs must be under 3 MB. Songs up to 25 MB work once the app is online.");
+    return { path: await readDataUrl(file), name: file.name, size: file.size, type: file.type };
+  }
+  async audioUrl(path) { return path; }
 }
 
 /* ----------------------------------------------------------------- cloud */
@@ -241,6 +246,14 @@ class CloudStore {
     return { path, name: file.name, size: file.size, type: file.type };
   }
   async fileUrl(path) { return this.check(await this.sb.storage.from("submissions").createSignedUrl(path, 3600, { download: true })).signedUrl; }
+  // songs: private bucket; listeners get a link that only works for 1 hour
+  async uploadAudio(file) {
+    if (file.size > LIMITS.audio) throw new Error("Songs must be under 25 MB. Try an MP3 or M4A file.");
+    const path = `${this.ws.id}/${uuid()}-${safeName(file.name)}`;
+    this.check(await this.sb.storage.from("audio").upload(path, file, { contentType: file.type || "audio/mpeg" }));
+    return { path, name: file.name, size: file.size, type: file.type };
+  }
+  async audioUrl(path) { return this.check(await this.sb.storage.from("audio").createSignedUrl(path, 3600)).signedUrl; }
 }
 
 function friendly(msg) {

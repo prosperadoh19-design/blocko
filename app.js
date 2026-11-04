@@ -60,6 +60,10 @@ const TYPES = {
   text: { name: "Text", ic: "¶", c: "#6c6977", content: true },
   divider: { name: "Divider", ic: "—", c: "#9a97a6", content: true },
   image: { name: "Image", ic: "▣", c: "#ff3e9a", content: true },
+  album: { name: "Music / album", ic: "♫", c: "#141318", content: true },
+  links: { name: "Social links", ic: "↗", c: "#141318", content: true },
+  gallery: { name: "Photo gallery", ic: "▦", c: "#141318", content: true },
+  work: { name: "Work & credits", ic: "◆", c: "#141318", content: true },
   short: { name: "Short answer", ic: "Aa", c: "#7b3ff2" },
   long: { name: "Paragraph", ic: "≡", c: "#7b3ff2" },
   email: { name: "Email", ic: "@", c: "#1f6bff" },
@@ -345,6 +349,15 @@ const TEMPLATES = {
       Q("choice", "Your budget per outfit", opts("Under ₦20,000", "₦20,000 – ₦50,000", "₦50,000 – ₦100,000", "Above ₦100,000", "Tell me the price")),
       Q("long", "Anything else we should know?"),
       Q("consent", "I understand that work starts after the deposit is paid.", { required: true })] },
+
+  artist: { name: "Music artist page", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Stream your album, share your links, photos and past work. Listen only, no downloads.",
+    title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria",
+    blocks: () => [
+      C("text", "Write a short bio here: who you are, your sound, where you're from and what you're working on now. Two or three sentences is perfect."),
+      { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()) },
+      { ...SHOW.links.make(), items: ["Spotify", "Apple Music", "Audiomack", "Boomplay", "YouTube", "Instagram", "TikTok"].map(label => ({ label, url: "" })) },
+      SHOW.gallery.make(),
+      SHOW.work.make()] },
 
   onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
     access: "code", accessCode: true,
@@ -726,7 +739,7 @@ async function viewEditor(id) {
   function palette(at) {
     sheet((b, close) => {
       const grp = (label, keys) => [h("h4", null, label), h("div", { class: "pal-grid" }, keys.map(k => h("button", { class: "pal", onclick: () => {
-        const nb = TYPES[k].content ? (k === "image" ? { id: uuid(), type: "image", url: "", caption: "" } : C(k, k === "heading" ? "Section title" : "")) : Q(k, "");
+        const nb = SHOW[k] ? SHOW[k].make() : TYPES[k].content ? (k === "image" ? { id: uuid(), type: "image", url: "", caption: "" } : C(k, k === "heading" ? "Section title" : "")) : Q(k, "");
         page.blocks.splice(at, 0, nb); sel = nb.id; close(); render(); save();
         setTimeout(() => { const f = list.querySelector(".block.sel input, .block.sel textarea"); if (f) f.focus(); }, 30);
       } }, h("span", { class: "ic", style: { background: TYPES[k].c } }, TYPES[k].ic), TYPES[k].name)))];
@@ -735,7 +748,8 @@ async function viewEditor(id) {
         grp("Choices", ["choice", "checkbox", "dropdown", "yesno", "rating", "scale", "consent"]),
         grp("Dates", ["date", "time", "datetime"]),
         grp("Uploads & signature", ["imageup", "docup", "file", "signature"]),
-        grp("Content", ["heading", "text", "image", "divider"])));
+        grp("Content", ["heading", "text", "image", "divider"]),
+        grp("Showcase (artists, portfolios)", ["album", "links", "gallery", "work"])));
     });
   }
   function blockCard(b, i) {
@@ -746,6 +760,7 @@ async function viewEditor(id) {
     if (!selected) {
       if (b.type === "heading") card.append(h("h2", null, b.text || "Section title"));
       else if (b.type === "text") card.append(h("div", { class: "body" + (b.text ? "" : " muted") }, b.text || "Click to write some text"));
+      else if (SHOW[b.type]) card.append(SHOW[b.type].preview(b));
       else if (b.type === "divider") card.append(h("hr"));
       else if (b.type === "image") card.append(b.url ? h("figure", { class: "img-fig" }, h("img", { src: b.url, alt: b.caption || "" }), b.caption ? h("figcaption", null, b.caption) : null) : h("div", { class: "fake tall", style: { justifyContent: "center", alignItems: "center", paddingTop: 0 } }, icon("image"), " Click to add a picture"));
       else {
@@ -765,6 +780,7 @@ async function viewEditor(id) {
     const g = h("div", { class: "edit-grid" });
     if (b.type === "heading") g.append(h("input", { class: "input", value: b.text, placeholder: "Section title", "aria-label": "Heading text", style: { fontWeight: 800, fontSize: "22px" }, oninput: e => { b.text = e.target.value; save(); } }));
     else if (b.type === "text") { const ta = h("textarea", { class: "textarea", value: b.text, placeholder: "Write anything: instructions, details, terms. Links become clickable.", "aria-label": "Text", oninput: e => { b.text = e.target.value; save(); } }); g.append(ta); }
+    else if (SHOW[b.type]) SHOW[b.type].edit(b, g, save);
     else if (b.type === "divider") g.append(h("hr", { style: { border: 0, borderTop: "3px solid var(--line)", width: "100%" } }));
     else if (b.type === "image") {
       const prev = h("div");
@@ -1104,10 +1120,11 @@ async function viewForm(id, preview) {
       h("div", { class: "site-body" }, slot, h("aside", { class: "site-ads", "aria-label": "Sponsored" }, about ? aboutTeaser(page, () => show("about")) : null, adSlot(), adSlot())),
       siteFooter(preview ? null : page.id));
   };
-  const body = h("div", { class: "form-page" });
+  const body = h("div", { class: "form-page" + (page.blocks.some(b => SHOW[b.type]) ? " showcase" : "") });
   page.blocks.forEach(b => {
     if (b.type === "heading") return body.append(h("div", { class: "fblock heading" }, h("h2", null, b.text)));
     if (b.type === "text") return body.append(h("div", { class: "fblock text" }, linkify(b.text)));
+    if (SHOW[b.type]) { const el = SHOW[b.type].view(b, page); return el ? body.append(el) : null; }
     if (b.type === "divider") return body.append(h("div", { class: "fblock divider" }, h("hr")));
     if (b.type === "image") return b.url ? body.append(h("figure", { class: "fblock img-fig" }, h("img", { src: b.url, alt: b.caption || "", loading: "lazy" }), b.caption ? h("figcaption", null, b.caption) : null)) : null;
     const fid = "q-" + b.id;
@@ -1182,6 +1199,7 @@ async function viewForm(id, preview) {
     if (Object.keys(blockEls).length === 3) body.append(h("div", { class: "ad-inline" }, adSlot()));
   });
   const btn = h("button", { class: "btn", type: "submit", disabled: closed }, preview ? "Submit (disabled in preview)" : "Submit");
+  if (!page.blocks.some(isQuestion)) body.append(h("div", { class: "ad-inline" }, adSlot()));
   const form = h("form", { novalidate: true, onsubmit: async e => {
     e.preventDefault(); if (preview) { toast("This is a preview. Publish the page to collect answers."); return; }
     let first = null;
@@ -1218,7 +1236,7 @@ async function viewForm(id, preview) {
         h("button", { class: "btn", onclick: () => route() }, "Send another response")), h("div", { class: "ad-inline after" }, adSlot())));
       window.scrollTo(0, 0);
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
-  } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
+  } }, body, !page.blocks.some(isQuestion) ? null : h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
   const access = page.access || "open";
   if (access === "open" || closed) {
     const pv = preview && access === "open" ? h("div", { class: "pv-bar" },
@@ -1343,7 +1361,7 @@ function aboutOn(page) {
     || (a.stats || []).some(s => s.value) || (a.slides || []).length || (a.links || []).some(l => l.url) || (a.gallery || []).some(c => (c.images || []).length);
 }
 const safeUrl = u => { try { const x = new URL(/^https?:\/\//i.test(u) ? u : "https://" + u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
-function galleryEl(cats) {
+function galleryEl(cats, title = "Gallery") {
   cats = cats.map(c => ({ name: (c.name || "").trim() || "Photos", images: c.images || [] })).filter(c => c.images.length);
   if (!cats.length) return null;
   let cur = "all";
@@ -1357,10 +1375,10 @@ function galleryEl(cats) {
     const n = items.length;
     grid.className = "gal-grid " + (n <= 3 ? "n" + n : (n - 1) % 4 === 0 ? "feat" : n % 4 === 0 ? "c4" : "c3");
     grid.replaceChildren(...items.map((it, i) => h("button", { class: "gal-item", "aria-label": "Open picture " + (i + 1) + " (" + it.cat + ")", onclick: () => lightbox(items, i) },
-      h("img", { src: it.u, alt: it.cat, loading: "lazy" }), h("span", { class: "gal-cap" }, it.cat))));
+      h("img", { src: it.u, alt: it.cat, loading: "lazy" }), cats.length > 1 ? h("span", { class: "gal-cap" }, it.cat) : null)));
   };
   draw();
-  return h("section", null, h("h3", null, "Gallery"), chips, grid);
+  return h("section", null, title ? h("h3", null, title) : null, chips, grid);
 }
 function lightbox(items, start) {
   let i = start;
@@ -1431,6 +1449,225 @@ function aboutPage(page, back) {
     linkBtns.length ? h("section", null, h("h3", null, "Links"), h("div", { class: "about-links" }, linkBtns)) : null,
     h("div", { class: "about-back" }, h("button", { class: "about-backbtn", onclick: back }, "← Back to the form")));
 }
+
+/* ============================================================ showcase blocks (artist / portfolio pages) */
+const fmtTime = t => !isFinite(t) || t <= 0 ? "" : Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
+const PLATFORMS = [[/open\.spotify|spotify\.com/i, "Spotify"], [/music\.apple|itunes\.apple/i, "Apple Music"], [/audiomack/i, "Audiomack"], [/boomplay/i, "Boomplay"],
+  [/youtube\.com|youtu\.be/i, "YouTube"], [/instagram/i, "Instagram"], [/tiktok/i, "TikTok"], [/(^|\.|\/)(twitter|x)\.com/i, "X (Twitter)"], [/facebook|fb\.com/i, "Facebook"],
+  [/soundcloud/i, "SoundCloud"], [/deezer/i, "Deezer"], [/tidal/i, "Tidal"], [/linkedin/i, "LinkedIn"], [/wa\.me|whatsapp/i, "WhatsApp"], [/snapchat/i, "Snapchat"], [/threads\.net/i, "Threads"], [/bandcamp/i, "Bandcamp"]];
+const platformOf = u => (PLATFORMS.find(([r]) => r.test(u || "")) || [0, "Website"])[1];
+const LISTEN = ["Spotify", "Apple Music", "Audiomack", "Boomplay", "SoundCloud", "Deezer", "Tidal", "Bandcamp"];
+const subOf = u => { const p = platformOf(u); if (LISTEN.includes(p)) return "Listen on " + p; if (p === "YouTube") return /@/.test(u) ? handleOf(u) : "Watch on YouTube"; if (p === "WhatsApp") return "Chat on WhatsApp"; return handleOf(u); };
+const handleOf = u => { try { const x = new URL(u); const seg = x.pathname.split("/").filter(Boolean); const last = seg[seg.length - 1] || ""; return last && !/^(artist|album|track|channel|user|c|in)$/i.test(last) && last.length < 32 ? (/^@/.test(last) ? last : seg.length === 1 ? "@" + last : last) : x.hostname.replace(/^www\./, ""); } catch (e) { return ""; } };
+const scLabel = (b, def) => h("div", { class: "sc-label" }, b.heading || def);
+const scHeadingInput = (b, def, save) => h("label", { class: "field" }, "Section title", h("input", { class: "input", value: b.heading || "", placeholder: def, maxLength: 40, oninput: e => { b.heading = e.target.value; save(); } }));
+const audioDuration = file => new Promise(res => { const a = new Audio(); const u = URL.createObjectURL(file); a.preload = "metadata"; a.onloadedmetadata = () => { res(a.duration); URL.revokeObjectURL(u); }; a.onerror = () => res(0); a.src = u; setTimeout(() => res(0), 6000); });
+let nowPlaying = null; // only one song plays at a time across the page
+
+const SHOW = {
+  album: {
+    make: () => ({ id: uuid(), type: "album", heading: "", title: "", kind: "Album", year: "", cover: "", tracks: [] }),
+    preview: b => h("div", { class: "sc-prev" }, b.cover ? h("img", { class: "sc-prev-cover", src: b.cover, alt: "" }) : h("div", { class: "sc-prev-cover empty" }, "♫"),
+      h("div", null, h("b", null, b.title || "Untitled " + (b.kind || "album").toLowerCase()), h("div", { class: "muted" }, (b.tracks || []).length + " song" + ((b.tracks || []).length === 1 ? "" : "s") + (b.year ? " · " + b.year : "")))),
+    edit(b, g, save) {
+      const cover = h("div", { class: "brand-slot" });
+      const drawCover = () => {
+        const btn = h("button", { class: "btn small dark", type: "button", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => {
+          btn.disabled = true; btn.textContent = "Uploading…";
+          try { b.cover = await store.uploadMedia(await compressImage(f, 1000, false)); save(); drawCover(); } catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Upload"; }
+        }) }, b.cover ? "Change" : "Upload");
+        cover.replaceChildren(h("div", { class: "brand-thumb" }, b.cover ? h("img", { src: b.cover, alt: "" }) : h("span", null, "Cover")),
+          h("div", { class: "brand-acts" }, h("b", null, "Cover art"), h("small", { class: "muted" }, "A square picture works best."), h("div", { style: { display: "flex", gap: "6px" } }, btn)));
+      };
+      drawCover();
+      const tracks = h("div", { class: "trk-ed-list" });
+      const MAXT = 30;
+      const drawTracks = () => {
+        const list = b.tracks || (b.tracks = []);
+        const add = h("button", { class: "btn small dark", type: "button", onclick: () => {
+          const i = h("input", { type: "file", accept: "audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac", multiple: true });
+          i.onchange = async () => {
+            const files = [...i.files].slice(0, MAXT - list.length); if (!files.length) return;
+            add.disabled = true;
+            for (let k = 0; k < files.length; k++) {
+              const f = files[k];
+              if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(f.name)) { toast(f.name + " isn't a song file."); continue; }
+              add.textContent = "Uploading " + (k + 1) + " of " + files.length + "…";
+              try { const dur = await audioDuration(f); const up = await store.uploadAudio(f);
+                list.push({ id: uuid(), title: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim(), path: up.path, dur: Math.round(dur) || 0 }); save(); drawTracks(); }
+              catch (e) { toast(e.message); }
+            }
+            drawTracks();
+          };
+          i.click();
+        } }, "+ Add songs");
+        tracks.replaceChildren(
+          ...list.map((t, ti) => h("div", { class: "trk-ed" }, h("span", { class: "trk-n" }, ti + 1),
+            h("input", { class: "input", value: t.title || "", placeholder: "Song title", maxLength: 80, "aria-label": "Song " + (ti + 1) + " title", oninput: e => { t.title = e.target.value; save(); } }),
+            h("span", { class: "muted trk-d" }, fmtTime(t.dur)),
+            h("button", { class: "icon-btn", type: "button", "aria-label": "Move up", disabled: ti === 0, onclick: () => { [list[ti - 1], list[ti]] = [list[ti], list[ti - 1]]; save(); drawTracks(); } }, icon("up")),
+            h("button", { class: "icon-btn", type: "button", "aria-label": "Remove song", onclick: () => { list.splice(ti, 1); save(); drawTracks(); } }, icon("x")))),
+          list.length ? "" : h("small", { class: "muted" }, "No songs yet. MP3 or M4A, up to 25 MB each."),
+          list.length < MAXT ? h("div", null, add) : "");
+      };
+      drawTracks();
+      g.append(scHeadingInput(b, "Music", save),
+        h("div", { class: "sc-row2" },
+          h("label", { class: "field" }, "Album / EP / single name", h("input", { class: "input", value: b.title || "", placeholder: "e.g. Lagos Nights", maxLength: 80, oninput: e => { b.title = e.target.value; save(); } })),
+          h("label", { class: "field" }, "Type", h("select", { class: "select", onchange: e => { b.kind = e.target.value; save(); } }, ["Album", "EP", "Single", "Mixtape"].map(k => h("option", { selected: (b.kind || "Album") === k }, k)))),
+          h("label", { class: "field" }, "Year", h("input", { class: "input", value: b.year || "", placeholder: "2026", maxLength: 4, inputMode: "numeric", oninput: e => { b.year = e.target.value; save(); } }))),
+        cover, h("div", { class: "field" }, "Songs", h("small", { class: "muted", style: { fontWeight: 400 } }, "Listeners can play the songs on the page, with no download button."), tracks));
+    },
+    view(b) {
+      const list = (b.tracks || []).filter(t => t.path);
+      if (!list.length && !b.title) return null;
+      const audio = h("audio", { preload: "none" });
+      audio.controlsList = "nodownload noplaybackrate"; audio.disableRemotePlayback = true;
+      const urls = {};
+      let cur = -1;
+      const rows = list.map((t, i) => h("button", { class: "trk", type: "button", onclick: () => cur === i ? toggle() : play(i) },
+        h("span", { class: "trk-n" }, h("span", { class: "num" }, i + 1), h("span", { class: "eq", "aria-hidden": "true" }, h("i"), h("i"), h("i"))),
+        h("span", { class: "trk-t" }, t.title || "Track " + (i + 1)), h("span", { class: "trk-d" }, fmtTime(t.dur))));
+      const bigBtn = h("button", { class: "alb-play", type: "button", "aria-label": "Play", onclick: () => cur < 0 ? play(0) : toggle() });
+      const nowT = h("div", { class: "pl-title" }, "—");
+      const seek = h("input", { type: "range", class: "pl-seek", min: 0, max: 1000, value: 0, "aria-label": "Seek", oninput: e => { if (audio.duration) audio.currentTime = audio.duration * e.target.value / 1000; } });
+      const tNow = h("span", null, "0:00"), tEnd = h("span", null, "0:00");
+      const prevB = h("button", { class: "pl-btn", type: "button", "aria-label": "Previous song", onclick: () => play(Math.max(0, cur - 1)) }, svg('<path d="M6 5v14M18 6l-9 6 9 6z"/>'));
+      const nextB = h("button", { class: "pl-btn", type: "button", "aria-label": "Next song", onclick: () => cur < list.length - 1 && play(cur + 1) }, svg('<path d="M18 5v14M6 6l9 6-9 6z"/>'));
+      const playB = h("button", { class: "pl-btn main", type: "button", "aria-label": "Play", onclick: () => cur < 0 ? play(0) : toggle() });
+      const paintBtns = () => {
+        const on = !audio.paused;
+        [bigBtn, playB].forEach(x => { x.replaceChildren(svg(on ? '<path d="M8 5h3v14H8zM13 5h3v14h-3z"/>' : '<path d="M8 5l11 7-11 7z"/>')); x.setAttribute("aria-label", on ? "Pause" : "Play"); });
+        bigBtn.lastChild.after(document.createTextNode(on ? " Pause" : " Play"));
+        rows.forEach((r, i) => { r.classList.toggle("on", i === cur); r.classList.toggle("playing", i === cur && on); });
+      };
+      async function play(i) {
+        if (!list[i]) return;
+        if (nowPlaying && nowPlaying !== audio) nowPlaying.pause();
+        nowPlaying = audio;
+        if (cur !== i) {
+          cur = i; nowT.textContent = list[i].title || "Track " + (i + 1);
+          try { const u = urls[i] && urls[i].at > Date.now() - 50 * 60e3 ? urls[i].u : (urls[i] = { u: await store.audioUrl(list[i].path), at: Date.now() }).u; audio.src = u; }
+          catch (e) { return toast("This song can't play right now."); }
+        }
+        audio.play().catch(() => toast("Tap play again to start the song."));
+      }
+      const toggle = () => audio.paused ? audio.play().catch(() => {}) : audio.pause();
+      audio.addEventListener("play", paintBtns); audio.addEventListener("pause", paintBtns);
+      audio.addEventListener("timeupdate", () => { tNow.textContent = fmtTime(audio.currentTime) || "0:00"; tEnd.textContent = fmtTime(audio.duration) || "0:00"; if (audio.duration) seek.value = Math.round(audio.currentTime / audio.duration * 1000); });
+      audio.addEventListener("ended", () => cur < list.length - 1 ? play(cur + 1) : (seek.value = 0));
+      const total = list.reduce((n, t) => n + (t.dur || 0), 0);
+      paintBtns();
+      const el = h("section", { class: "fblock sc album", oncontextmenu: e => e.preventDefault() }, scLabel(b, "Music"),
+        h("div", { class: "alb-head" }, b.cover ? h("img", { class: "alb-cover", src: b.cover, alt: (b.title || "Album") + " cover", draggable: false }) : h("div", { class: "alb-cover empty" }, "♫"),
+          h("div", { class: "alb-info" }, h("small", null, [b.kind || "Album", b.year].filter(Boolean).join(" · ")), h("h2", null, b.title || "Untitled"),
+            h("div", { class: "muted" }, list.length + " song" + (list.length === 1 ? "" : "s") + (total ? " · " + (total < 3600 ? Math.max(1, Math.round(total / 60)) + " min" : Math.floor(total / 3600) + " hr " + Math.round(total % 3600 / 60) + " min") : "")),
+            list.length ? bigBtn : null)),
+        list.length ? h("div", { class: "player" }, h("div", { class: "pl-row" }, prevB, playB, nextB, nowT), h("div", { class: "pl-seekrow" }, tNow, seek, tEnd)) : null,
+        list.length ? h("div", { class: "trk-list" }, rows) : h("p", { class: "muted" }, "Songs coming soon."),
+        audio);
+      return el;
+    }
+  },
+  links: {
+    make: () => ({ id: uuid(), type: "links", heading: "", items: [] }),
+    preview: b => h("div", { class: "sc-chips" }, (b.items || []).filter(l => l.url).length ? (b.items || []).filter(l => l.url).map(l => h("span", { class: "sc-chip" }, l.label || platformOf(l.url))) : h("span", { class: "muted" }, "No links yet")),
+    edit(b, g, save) {
+      const box = h("div", { class: "edit-grid", style: { gap: "8px" } });
+      const draw = () => {
+        const list = b.items || (b.items = []);
+        box.replaceChildren(...list.map((l, i) => {
+          const tag = h("span", { class: "lk-plat" }, l.url ? platformOf(l.url) : (l.label || "Link"));
+          return h("div", { class: "lk-ed" }, tag,
+            h("input", { class: "input", type: "url", value: l.url || "", placeholder: l.label ? "Paste your " + l.label + " link" : "https://instagram.com/yourname", maxLength: 300, "aria-label": "Link address", oninput: e => { l.url = e.target.value.trim(); tag.textContent = l.url ? platformOf(l.url) : (l.label || "Link"); save(); },
+              onblur: e => { if (e.target.value && !/^https?:\/\//i.test(e.target.value)) { l.url = e.target.value = "https://" + e.target.value.trim(); tag.textContent = platformOf(l.url); save(); } } }),
+            h("input", { class: "input", value: l.label || "", placeholder: "Name (optional)", maxLength: 40, "aria-label": "Link name", oninput: e => { l.label = e.target.value; save(); } }),
+            h("button", { class: "icon-btn", type: "button", "aria-label": "Remove link", onclick: () => { list.splice(i, 1); save(); draw(); } }, icon("x")));
+        }), list.length < 12 ? h("button", { class: "add-btn", style: { justifySelf: "start" }, type: "button", onclick: () => { list.push({ url: "", label: "" }); save(); draw(); } }, icon("plus"), "Add a link") : "");
+      };
+      draw();
+      g.append(scHeadingInput(b, "Follow & listen", save), h("small", { class: "muted" }, "Paste your Spotify, Apple Music, Audiomack, Boomplay, YouTube, Instagram, TikTok or any other link. We name it for you."), box);
+    },
+    view(b) {
+      const items = (b.items || []).map(l => ({ ...l, href: l.url && safeUrl(l.url) })).filter(l => l.href);
+      if (!items.length) return null;
+      return h("section", { class: "fblock sc" }, scLabel(b, "Follow & listen"),
+        h("div", { class: "lk-grid" }, items.map(l => h("a", { class: "lk", href: l.href, target: "_blank", rel: "noopener" },
+          h("span", { class: "lk-mark" }, (l.label || platformOf(l.href)).slice(0, 1)),
+          h("span", { class: "lk-txt" }, h("b", null, l.label || platformOf(l.href)), h("small", null, subOf(l.href))), h("i", null, "↗")))));
+    }
+  },
+  gallery: {
+    make: () => ({ id: uuid(), type: "gallery", heading: "", images: [] }),
+    preview: b => (b.images || []).length ? h("div", { class: "slide-thumbs" }, b.images.slice(0, 8).map(u => h("div", { class: "slide-thumb" }, h("img", { src: u, alt: "" }))), b.images.length > 8 ? h("span", { class: "muted" }, "+" + (b.images.length - 8)) : null) : h("span", { class: "muted" }, "No photos yet"),
+    edit(b, g, save) {
+      const box = h("div", { class: "field" });
+      const MAX = 40;
+      const draw = () => {
+        const list = b.images || (b.images = []);
+        const add = h("button", { class: "btn small dark", type: "button", onclick: () => {
+          const i = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", multiple: true });
+          i.onchange = async () => {
+            const files = [...i.files].slice(0, MAX - list.length); if (!files.length) return;
+            add.disabled = true;
+            for (let k = 0; k < files.length; k++) { add.textContent = "Uploading " + (k + 1) + " of " + files.length + "…"; try { list.push(await store.uploadMedia(await compressImage(files[k], 1600, false))); save(); } catch (e) { toast(e.message); } }
+            draw();
+          };
+          i.click();
+        } }, "+ Add photos");
+        box.replaceChildren("Photos", list.length ? h("div", { class: "slide-thumbs" }, list.map((u, i) => h("div", { class: "slide-thumb" }, h("img", { src: u, alt: "" }),
+          h("button", { type: "button", "aria-label": "Remove photo", onclick: () => { list.splice(i, 1); save(); draw(); } }, "✕")))) : "",
+          h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } }, list.length < MAX ? add : "", h("small", { class: "muted" }, list.length + " / " + MAX)));
+      };
+      draw();
+      g.append(scHeadingInput(b, "Photos", save), box);
+    },
+    view(b) {
+      const imgs = b.images || [];
+      if (!imgs.length) return null;
+      const el = galleryEl([{ name: b.heading || "Photos", images: imgs }], null);
+      return h("section", { class: "fblock sc" }, scLabel(b, "Photos"), el);
+    }
+  },
+  work: {
+    make: () => ({ id: uuid(), type: "work", heading: "", items: [] }),
+    preview: b => (b.items || []).length ? h("div", { class: "wk-prev" }, b.items.slice(0, 4).map(w => h("div", null, h("b", null, w.title || "Untitled"), w.org ? " · " + w.org : "", w.date ? h("span", { class: "muted" }, "  " + w.date) : null))) : h("span", { class: "muted" }, "No work added yet"),
+    edit(b, g, save) {
+      const box = h("div", { class: "edit-grid", style: { gap: "10px" } });
+      const draw = () => {
+        const list = b.items || (b.items = []);
+        box.replaceChildren(...list.map((w, i) => {
+          const pic = h("button", { class: "wk-pic", type: "button", title: "Add a picture", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => {
+            try { w.img = await store.uploadMedia(await compressImage(f, 600, false)); save(); draw(); } catch (e) { toast(e.message); } }) },
+            w.img ? h("img", { src: w.img, alt: "" }) : h("span", null, "+ Pic"));
+          const inp = (k, ph, max = 80) => h("input", { class: "input", value: w[k] || "", placeholder: ph, maxLength: max, oninput: e => { w[k] = e.target.value; save(); } });
+          return h("div", { class: "wk-ed" },
+            h("div", { class: "wk-ed-top" }, pic, h("div", { class: "edit-grid", style: { gap: "6px" } },
+              inp("title", "What you did, e.g. Featured artist, Producer, Live performance"), inp("org", "Project / client, e.g. \"Ayo\" by Tems, Felabration 2025"))),
+            h("div", { class: "sc-row2" }, inp("date", "When, e.g. Mar 2025", 30), h("input", { class: "input", type: "url", value: w.url || "", placeholder: "Link to the work (https://…)", maxLength: 300, oninput: e => { w.url = e.target.value.trim(); save(); },
+              onblur: e => { if (e.target.value && !/^https?:\/\//i.test(e.target.value)) { w.url = e.target.value = "https://" + e.target.value.trim(); save(); } } })),
+            h("textarea", { class: "textarea", style: { minHeight: "60px" }, value: w.desc || "", placeholder: "A short description (optional)", maxLength: 400, oninput: e => { w.desc = e.target.value; save(); } }),
+            h("div", { class: "wk-ed-tools" },
+              h("button", { class: "icon-btn", type: "button", "aria-label": "Move up", disabled: i === 0, onclick: () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; save(); draw(); } }, icon("up")),
+              w.img ? h("button", { class: "btn small", type: "button", onclick: () => { delete w.img; save(); draw(); } }, "Remove picture") : "",
+              h("button", { class: "btn small", type: "button", style: { color: "var(--danger)" }, onclick: () => { list.splice(i, 1); save(); draw(); } }, "Delete")));
+        }), list.length < 30 ? h("button", { class: "add-btn", style: { justifySelf: "start" }, type: "button", onclick: () => { list.unshift({ title: "", org: "", date: "", url: "", desc: "" }); save(); draw(); } }, icon("plus"), "Add work") : "");
+      };
+      draw();
+      g.append(scHeadingInput(b, "Work & credits", save), h("small", { class: "muted" }, "Songs you featured on, shows, collaborations, projects. Newest first."), box);
+    },
+    view(b) {
+      const items = (b.items || []).filter(w => w.title || w.org);
+      if (!items.length) return null;
+      return h("section", { class: "fblock sc" }, scLabel(b, "Work & credits"),
+        h("div", { class: "wk-list" }, items.map(w => { const href = w.url && safeUrl(w.url); return h("article", { class: "wk" },
+          w.img ? h("img", { class: "wk-logo", src: w.img, alt: "", loading: "lazy" }) : h("div", { class: "wk-logo mono", "aria-hidden": "true" }, svg('<path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>')),
+          h("div", { class: "wk-body" }, h("h4", null, w.title || w.org), w.title && w.org ? h("div", { class: "wk-org" }, w.org) : null, w.date ? h("div", { class: "wk-date" }, w.date) : null,
+            w.desc ? h("p", null, w.desc) : null, href ? h("a", { class: "wk-link", href, target: "_blank", rel: "noopener" }, "View ", h("span", null, "↗")) : null)); })));
+    }
+  }
+};
+
 function siteNav(page, preview, tabs) {
   const b = page.brand || {};
   return h("nav", { class: "site-nav" }, h("div", { class: "site-nav-in" },
