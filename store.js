@@ -34,6 +34,12 @@ class DemoStore {
   }
   async init() {}
   async getUser() { return { id: "demo", email: "you@demo" }; }
+  async isAdmin() { return true; }
+  async listAds() { return (this.data.ads || []).filter(a => a.active && (!a.ends_on || a.ends_on >= new Date().toISOString().slice(0, 10))); }
+  async adminListAds() { return (this.data.ads || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)); }
+  async saveAd(ad) { this.data.ads ||= []; const i = this.data.ads.findIndex(x => x.id === ad.id); const row = { views: 0, clicks: 0, created_at: new Date().toISOString(), ...ad, id: ad.id || uuid() }; if (i >= 0) this.data.ads[i] = { ...this.data.ads[i], ...row }; else this.data.ads.push(row); this.persist(); return row; }
+  async deleteAd(id) { this.data.ads = (this.data.ads || []).filter(a => a.id !== id); this.persist(); }
+  async adEvent(id, kind) { const a = (this.data.ads || []).find(x => x.id === id); if (a) { a[kind === "click" ? "clicks" : "views"]++; this.persist(); } }
   async termsAccepted() { return !!(this.data.terms && this.data.terms.version === TERMS_VERSION); }
   async acceptTerms() { this.data.terms = { version: TERMS_VERSION, at: new Date().toISOString() }; this.persist(); }
   async reportForm(pageId, reason, details, email) { (this.data.reports ||= []).push({ page_id: pageId, reason, details, email, at: new Date().toISOString() }); this.persist(); }
@@ -138,6 +144,16 @@ class CloudStore {
   async getUser() { const { data } = await this.sb.auth.getUser(); return data.user || null; }
   onAuth(cb) { this.sb.auth.onAuthStateChange((_e, session) => cb(session ? session.user : null)); }
   async signIn(email, password) { return this.check(await this.sb.auth.signInWithPassword({ email, password })); }
+  async isAdmin() { try { return !!this.check(await this.sb.rpc("is_admin")); } catch (e) { return false; } }
+  async listAds() { try { return this.check(await this.sb.from("ads").select("id,title,body,image,link,cta,advertiser").limit(20)); } catch (e) { return []; } }
+  async adminListAds() { return this.check(await this.sb.from("ads").select("*").order("created_at", { ascending: false })); }
+  async saveAd(ad) {
+    const body = { title: ad.title, body: ad.body || "", image: ad.image || "", link: ad.link, cta: ad.cta || "Learn more", advertiser: ad.advertiser || "", active: !!ad.active, ends_on: ad.ends_on || null };
+    if (ad.id) return this.check(await this.sb.from("ads").update(body).eq("id", ad.id).select().single());
+    return this.check(await this.sb.from("ads").insert(body).select().single());
+  }
+  async deleteAd(id) { this.check(await this.sb.from("ads").delete().eq("id", id)); }
+  async adEvent(id, kind) { try { await this.sb.rpc("ad_event", { p_ad: id, p_kind: kind }); } catch (e) {} }
   async termsAccepted() {
     const u = await this.getUser(); return !!(u && u.user_metadata && u.user_metadata.terms_version === TERMS_VERSION);
   }

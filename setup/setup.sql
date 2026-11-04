@@ -278,3 +278,50 @@ create table if not exists public.reports (
 alter table public.reports enable row level security;
 drop policy if exists "anyone can report a form" on public.reports;
 create policy "anyone can report a form" on public.reports for insert to anon, authenticated with check (true);
+
+-------------------------------------------------- ads on published pages (v6)
+-- Blocko admins (the app owner) manage the sponsored ads shown on published forms.
+create table if not exists public.admins (
+  user_id uuid primary key references auth.users on delete cascade
+);
+alter table public.admins enable row level security;
+drop policy if exists "admins see themselves" on public.admins;
+create policy "admins see themselves" on public.admins for select to authenticated using (user_id = auth.uid());
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from admins where user_id = auth.uid())
+$$;
+grant execute on function public.is_admin() to authenticated;
+
+create table if not exists public.ads (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  body text not null default '',
+  image text not null default '',
+  link text not null,
+  cta text not null default 'Learn more',
+  advertiser text not null default '',
+  active boolean not null default true,
+  ends_on date,
+  views integer not null default 0,
+  clicks integer not null default 0,
+  created_at timestamptz not null default now(),
+  constraint ad_link_https check (link ~* '^https://'),
+  constraint ad_sizes check (char_length(title) <= 80 and char_length(body) <= 200 and char_length(cta) <= 30)
+);
+alter table public.ads enable row level security;
+drop policy if exists "anyone sees running ads" on public.ads;
+create policy "anyone sees running ads" on public.ads for select to anon, authenticated
+  using (active and (ends_on is null or ends_on >= current_date));
+drop policy if exists "admins manage ads" on public.ads;
+create policy "admins manage ads" on public.ads for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- count a view or a click (people seeing ads can't edit them, only bump these counters)
+create or replace function public.ad_event(p_ad uuid, p_kind text) returns void
+language sql security definer set search_path = public as $$
+  update ads set views = views + case when p_kind = 'view' then 1 else 0 end,
+                 clicks = clicks + case when p_kind = 'click' then 1 else 0 end
+  where id = p_ad and active;
+$$;
+grant execute on function public.ad_event(uuid, text) to anon, authenticated;

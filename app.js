@@ -483,6 +483,7 @@ async function viewHome() {
   const right = h("div", { style: { display: "flex", gap: "4px" } },
     installEvt ? h("button", { class: "btn small light", onclick: doInstall }, icon("install"), h("span", { class: "hide-sm" }, "Install app")) : null,
     h("button", { class: "ws-btn", onclick: workspaceSheet, "aria-label": "Switch workspace" }, h("span", { class: "ws-dot" }, (store.ws ? store.ws.name : "W").trim().charAt(0).toUpperCase()), h("span", { class: "hide-sm" }, store.ws ? store.ws.name : ""), icon("chev")),
+    (await store.isAdmin()) ? h("button", { class: "btn small light", onclick: () => go("ads") }, "📣 Ads") : null,
     h("button", { class: "icon-btn", "aria-label": "Team", title: "Team", onclick: teamSheet }, icon("team")),
     store.mode === "cloud" ? h("button", { class: "icon-btn", "aria-label": "Account", onclick: accountSheet }, icon("user")) : null);
   const total = pages.reduce((a, p) => a + (p.response_count || 0), 0);
@@ -877,6 +878,9 @@ async function viewForm(id, preview) {
     markEl(page),
     h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null));
   const closed = !preview && !page.accepting;
+  const site = (topBarEl, main) => (header.firstChild && (header.firstChild.style.maxWidth = "1120px"), mount(pageBg(page), topBarEl, siteNav(page, preview), header,
+    h("div", { class: "site-body" }, h("div", { class: "site-main" }, main), h("aside", { class: "site-ads", "aria-label": "Sponsored" }, adSlot(), adSlot())),
+    siteFooter(preview ? null : page.id)));
   const body = h("div", { class: "form-page" });
   page.blocks.forEach(b => {
     if (b.type === "heading") return body.append(h("div", { class: "fblock heading" }, h("h2", null, b.text)));
@@ -951,6 +955,7 @@ async function viewForm(id, preview) {
       }
     }
     box.append(ctrl); blockEls[b.id] = box; body.append(box);
+    if (Object.keys(blockEls).length === 3) body.append(h("div", { class: "ad-inline" }, adSlot()));
   });
   const btn = h("button", { class: "btn", type: "submit", disabled: closed }, preview ? "Submit (disabled in preview)" : "Submit");
   const form = h("form", { novalidate: true, onsubmit: async e => {
@@ -983,9 +988,10 @@ async function viewForm(id, preview) {
       }
       btn.textContent = "Sending…";
       await store.submitResponse(page.id, out, submitOpts);
-      mount(pageBg(page), header, h("div", { class: "form-page" }, h("div", { class: "fblock thanks" }, h("div", { class: "big" }, "🎉"), h("h2", null, "Sent!"),
+      site(null, h("div", { class: "form-page" }, h("div", { class: "fblock thanks" }, h("div", { class: "big" }, "🎉"), h("h2", null, "Sent!"),
         h("p", { class: "muted", style: { fontSize: "18px" } }, page.thank_you || "Thanks! We got your answers."),
-        h("button", { class: "btn", onclick: () => route() }, "Send another response"))), madeWith(page.id));
+        h("button", { class: "btn", onclick: () => route() }, "Send another response")), h("div", { class: "ad-inline after" }, adSlot())));
+      window.scrollTo(0, 0);
     } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
   } }, body, h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
   const access = page.access || "open";
@@ -996,7 +1002,7 @@ async function viewForm(id, preview) {
         ev.currentTarget.disabled = true;
         try { await store.savePage({ ...page, access: "email" }); toast("Sign-in turned on"); route(); } catch (e) { toast(e.message); ev.currentTarget.disabled = false; }
       } }, "Require sign-in")) : null;
-    return mount(pageBg(page), pv, header, form, madeWith(preview ? null : page.id));
+    return site(pv, form);
   }
 
   /* ---- sign-in screen: shown before the questions when the creator turned it on ---- */
@@ -1008,7 +1014,7 @@ async function viewForm(id, preview) {
       who ? h("span", null, "Signed in as ", h("b", null, who)) : null,
       needCode ? h("span", null, "🔓 Access code accepted") : null,
       who ? h("button", { class: "btn small light", onclick: async () => { await store.forgetRespondent(); route(); } }, "Sign out") : null);
-    mount(pageBg(page), bar, header, form, madeWith(preview ? null : page.id));
+    site(bar, form);
   };
   const next = async () => {
     if (needEmail && !(await store.respondentEmail().catch(() => null))) return drawGate("email");
@@ -1103,6 +1109,45 @@ async function viewForm(id, preview) {
   setTimeout(() => { const f = panel.querySelector("input"); if (f) f.focus(); }, 60);
   };
   await next();
+}
+function siteNav(page, preview) {
+  const b = page.brand || {};
+  return h("nav", { class: "site-nav" }, h("div", { class: "site-nav-in" },
+    h("div", { class: "site-brand" }, b.logo ? h("img", { src: b.logo, alt: "" }) : h("span", { class: "e" }, page.emoji || "📝"), h("b", null, page.title || "Untitled page")),
+    h("div", { class: "spacer" }),
+    preview ? h("span", { class: "pill draft" }, "Preview") : null,
+    h("a", { class: "btn small dark site-cta", href: location.pathname + "#home" }, "Create a free form")));
+}
+function siteFooter(pageId) {
+  return h("footer", { class: "site-foot" }, h("div", { class: "site-foot-in" },
+    h("div", { class: "foot-promo" }, h("div", { class: "logo" }, h("span", { class: "mk" }, h("i"), h("i"), h("i"), h("i")), "Blocko"),
+      h("p", null, "Make pages that tell and forms that collect. Free for everyone."),
+      h("a", { class: "btn small", style: { background: "#fff", borderColor: "#fff", color: "var(--ink)" }, href: location.pathname + "#home" }, "Create your own form, free →")),
+    h("div", { class: "foot-links" }, h("a", { href: "#terms" }, "Terms of Use"),
+      pageId ? h("button", { class: "report-link", onclick: () => reportSheet(pageId) }, "Report this form") : null,
+      h("span", null, "© " + new Date().getFullYear() + " Blocko"))));
+}
+let adsCache = null, adTurn = 0;
+const getAds = () => adsCache ||= store.listAds().then(list => list.sort(() => Math.random() - 0.5)).catch(() => []);
+function adSlot() {
+  const el = h("div", { class: "ad-slot" });
+  getAds().then(list => el.replaceChildren(list.length ? adCard(list[adTurn++ % list.length]) : houseAd()));
+  return el;
+}
+function adCard(ad) {
+  store.adEvent(ad.id, "view");
+  return h("a", { class: "ad-card", href: ad.link, target: "_blank", rel: "noopener sponsored nofollow", onclick: () => store.adEvent(ad.id, "click") },
+    h("span", { class: "ad-tag" }, "Sponsored"),
+    ad.image ? h("img", { src: ad.image, alt: "", loading: "lazy" }) : null,
+    h("div", { class: "ad-txt" }, h("b", null, ad.title), ad.body ? h("p", null, ad.body) : null,
+      h("span", { class: "ad-cta" }, (ad.cta || "Learn more") + " →"), ad.advertiser ? h("small", null, ad.advertiser) : null));
+}
+function houseAd() {
+  const c = (window.BLOCKO_CONFIG || {}).contactEmail;
+  return h("a", { class: "ad-card house", href: c ? "mailto:" + c + "?subject=Advertise%20on%20Blocko" : location.pathname + "#home", target: c ? null : "_blank" },
+    h("span", { class: "ad-tag" }, "Advertise here"),
+    h("div", { class: "ad-txt" }, h("b", null, "Your business could be here"), h("p", null, "Reach people filling in forms on Blocko every day."),
+      h("span", { class: "ad-cta" }, (c ? "Contact us" : "Get started") + " →")));
 }
 const madeWith = (pageId) => h("div", { class: "made" }, "Made with ", h("a", { href: location.pathname + "#home" }, "Blocko"), " · ",
   h("a", { href: "#terms" }, "Terms"), pageId ? [" · ", h("button", { class: "report-link", onclick: () => reportSheet(pageId) }, "Report this form")] : null);
@@ -1203,6 +1248,77 @@ async function viewResponses(id) {
       content));
 }
 
+/* ============================================================ ads manager (app owner only) */
+async function viewAdsManager() {
+  if (!(await store.isAdmin())) { toast("Only the Blocko owner can manage ads."); return go("home"); }
+  const ads = await store.adminListAds();
+  const views = ads.reduce((a, x) => a + (x.views || 0), 0), clicks = ads.reduce((a, x) => a + (x.clicks || 0), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const running = ads.filter(a => a.active && (!a.ends_on || a.ends_on >= today)).length;
+  const list = ads.length ? h("div", { class: "ads-list" }, ads.map(ad => {
+    const live = ad.active && (!ad.ends_on || ad.ends_on >= today);
+    return h("div", { class: "ads-row" },
+      h("div", { class: "ads-prev" }, adCardStatic(ad)),
+      h("div", { class: "ads-info" },
+        h("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" } }, h("b", null, ad.title), h("span", { class: "pill " + (live ? "live" : "draft") }, live ? "Running" : ad.active ? "Ended" : "Paused")),
+        h("div", { class: "muted", style: { fontSize: "14px" } }, (ad.advertiser ? ad.advertiser + " · " : "") + ad.link),
+        h("div", { class: "ads-stats" }, h("span", null, h("b", null, (ad.views || 0).toLocaleString()), " views"), h("span", null, h("b", null, (ad.clicks || 0).toLocaleString()), " clicks"),
+          h("span", null, h("b", null, ad.views ? ((ad.clicks || 0) / ad.views * 100).toFixed(1) + "%" : "—"), " click rate"), ad.ends_on ? h("span", null, "Ends " + ad.ends_on) : null),
+        h("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+          h("button", { class: "btn small", onclick: () => adSheet(ad) }, "Edit"),
+          h("button", { class: "btn small", onclick: async () => { await store.saveAd({ ...ad, active: !ad.active }); toast(ad.active ? "Ad paused" : "Ad running"); adsCache = null; route(); } }, ad.active ? "Pause" : "Resume"),
+          h("button", { class: "btn small", style: { color: "var(--danger)" }, onclick: () => confirmSheet("Delete this ad?", "Its views and clicks are deleted too.", "Delete", async () => { await store.deleteAd(ad.id); adsCache = null; route(); }) }, "Delete"))));
+  })) : h("div", { class: "empty" }, h("h3", null, "No ads yet"), h("p", { class: "muted" }, "Until you add one, published forms show an “Advertise here” box that points people to you."),
+    h("button", { class: "btn brand", onclick: () => adSheet() }, icon("plus"), "Create your first ad"));
+  mount(h("header", { class: "band on-color", style: { background: "var(--c-ink)" } }, h("div", { class: "wrap" },
+      topBar(h("div", { style: { display: "flex", gap: "4px", alignItems: "center" } }, h("button", { class: "icon-btn", "aria-label": "Back to home", onclick: () => go("home") }, icon("back")), logo()),
+        h("button", { class: "btn small light", onclick: () => adSheet() }, icon("plus"), "New ad")),
+      h("h1", null, "Ads manager"), h("p", null, "Sponsored ads appear beside and below every published form. Only you can see this page."))),
+    h("main", { class: "wrap" },
+      h("div", { class: "stats" }, h("div", { class: "stat" }, h("b", null, running), h("span", null, "Ads running")), h("div", { class: "stat" }, h("b", null, views.toLocaleString()), h("span", null, "Total views")),
+        h("div", { class: "stat" }, h("b", null, clicks.toLocaleString()), h("span", null, "Total clicks"))),
+      list, h("div", { style: { height: "60px" } })));
+}
+function adCardStatic(ad) {
+  return h("div", { class: "ad-card", style: { pointerEvents: "none" } }, h("span", { class: "ad-tag" }, "Sponsored"),
+    ad.image ? h("img", { src: ad.image, alt: "" }) : null,
+    h("div", { class: "ad-txt" }, h("b", null, ad.title || "Your headline"), ad.body ? h("p", null, ad.body) : null, h("span", { class: "ad-cta" }, (ad.cta || "Learn more") + " →"), ad.advertiser ? h("small", null, ad.advertiser) : null));
+}
+function adSheet(existing) {
+  const ad = existing ? { ...existing } : { title: "", body: "", image: "", link: "https://", cta: "Learn more", advertiser: "", active: true, ends_on: "" };
+  sheet((b, close) => {
+    const prev = h("div", { class: "ads-prev big" });
+    const draw = () => prev.replaceChildren(adCardStatic(ad));
+    const f = (id, label, el) => h("label", { class: "field", for: id }, label, el);
+    const inp = (id, key, props) => h("input", { class: "input", id, value: ad[key] || "", ...props, oninput: e => { ad[key] = e.target.value; draw(); } });
+    const img = h("button", { class: "btn small dark", type: "button", onclick: () => pickFile("image/png,image/jpeg,image/webp,image/gif", async file => {
+      img.disabled = true; img.lastChild.textContent = "Uploading…";
+      try { ad.image = await store.uploadMedia(await compressImage(file, 1200, false)); draw(); } catch (e) { toast(e.message); }
+      img.disabled = false; img.lastChild.textContent = ad.image ? "Change picture" : "Upload picture";
+    }) }, icon("image"), h("span", null, ad.image ? "Change picture" : "Upload picture"));
+    const save = h("button", { class: "btn brand", type: "submit" }, existing ? "Save ad" : "Publish ad");
+    b.append(h("h2", null, existing ? "Edit ad" : "New ad"), prev,
+      h("form", { style: { display: "grid", gap: "12px" }, onsubmit: async e => {
+        e.preventDefault();
+        if (!ad.title.trim()) return toast("Add a headline.");
+        if (!/^https:\/\/[^\s.]+\.[^\s]+$/i.test(ad.link.trim())) return toast("The link must be a full web address starting with https://");
+        save.disabled = true;
+        try { await store.saveAd({ ...ad, title: ad.title.trim(), link: ad.link.trim(), ends_on: ad.ends_on || null }); adsCache = null; close(); toast(existing ? "Ad saved" : "Ad is live"); route(); }
+        catch (err) { toast(err.message); save.disabled = false; }
+      } },
+        f("ad-adv", "Advertiser (who is paying)", inp("ad-adv", "advertiser", { placeholder: "e.g. Mama Put Kitchen", maxLength: 60 })),
+        f("ad-t", "Headline", inp("ad-t", "title", { placeholder: "e.g. 20% off lunch this week", maxLength: 80, required: true })),
+        f("ad-b", "Short text", inp("ad-b", "body", { placeholder: "One line about the offer", maxLength: 200 })),
+        h("div", { class: "field" }, "Picture (optional)", h("div", { style: { display: "flex", gap: "8px" } }, img, ad.image ? h("button", { class: "btn small", type: "button", onclick: () => { ad.image = ""; draw(); } }, "Remove") : null)),
+        f("ad-l", "Link (where the ad goes)", inp("ad-l", "link", { type: "url", placeholder: "https://example.com", required: true })),
+        f("ad-c", "Button text", inp("ad-c", "cta", { maxLength: 30 })),
+        f("ad-e", "End date (optional)", inp("ad-e", "ends_on", { type: "date" })),
+        h("label", { class: "switch" }, h("input", { type: "checkbox", checked: ad.active, onchange: e => { ad.active = e.target.checked; } }), "Show this ad now"),
+        h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: close }, "Cancel"), save)));
+    draw();
+  });
+}
+
 /* ============================================================ terms */
 function termsBody() {
   const contact = (window.BLOCKO_CONFIG || {}).contactEmail;
@@ -1277,6 +1393,7 @@ async function route() {
     if (my !== routing) return;
     if (kind === "p" && id) return await viewEditor(id);
     if (kind === "r" && id) return await viewResponses(id);
+    if (kind === "ads") return await viewAdsManager();
     if (kind === "v" && id) return await viewForm(id, true);
     return await viewHome();
   } catch (e) {
