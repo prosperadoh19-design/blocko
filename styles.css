@@ -680,3 +680,5 @@ body.about-mode .about-teaser{display:none}
 .ph-pick:focus-within .ph-face{border-color:var(--page,#7c3aed)}
 .ph-num{flex:1;min-width:0}
 .ph-sel:disabled{cursor:not-allowed}
+.lg-about{align-self:flex-start;margin-top:18px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:10px 16px;font:700 14px/1 var(--body,inherit);cursor:pointer;position:relative;z-index:1}
+.lg-about:hover{background:rgba(255,255,255,.24)}

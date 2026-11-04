@@ -1169,6 +1169,7 @@ async function viewForm(id, preview) {
     preview ? h("button", { class: "btn small light lg-back", onclick: () => go("p-" + page.id) }, icon("back"), "Back to editing") : null,
     markEl(page, "lg-mark"),
     h("div", { class: "lg-copy" }, h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null),
+    aboutOn(page) ? h("button", { class: "lg-about", onclick: () => openAboutAlone(page, preview) }, "About " + (page.brand.about.name || page.title || "us") + " →") : null,
     h("div", { class: "lg-foot" }, preview ? "Preview · this is what visitors see first" : "🔒 Private form"));
   const panel = h("div", { class: "lg-panel" });
   const msg = h("div", { class: "lg-msg", role: "alert" });
@@ -1252,7 +1253,12 @@ async function viewForm(id, preview) {
   };
   await next();
 }
-function aboutOn(page) { const a = (page.brand || {}).about; return !!(a && a.on && (a.story || a.tagline || (a.stats || []).some(s => s.value) || a.wins || a.photo || (a.slides || []).length || (a.links || []).length || (a.gallery || []).some(c => (c.images || []).length))); }
+function aboutOn(page) {
+  const a = (page.brand || {}).about;
+  if (!a || !a.on) return false;
+  return ["name", "tagline", "story", "wins", "photo", "website", "email", "phone", "address"].some(k => (a[k] || "").toString().trim())
+    || (a.stats || []).some(s => s.value) || (a.slides || []).length || (a.links || []).some(l => l.url) || (a.gallery || []).some(c => (c.images || []).length);
+}
 const safeUrl = u => { try { const x = new URL(/^https?:\/\//i.test(u) ? u : "https://" + u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
 function galleryEl(cats) {
   cats = cats.map(c => ({ name: (c.name || "").trim() || "Photos", images: c.images || [] })).filter(c => c.images.length);
@@ -1304,6 +1310,14 @@ function slideshow(urls) {
   paint(); restart();
   return h("div", { class: "slides-wrap" }, h("div", { class: "slides" }, track),
     urls.length > 1 ? h("div", { class: "slides-ctrl" }, count, h("div", { class: "slides-prog" }, bar), h("div", { class: "slides-btns" }, arrow(-1, "Previous picture"), arrow(1, "Next picture"))) : null);
+}
+// About page on its own, opened from the sign-in screen
+function openAboutAlone(page, preview) {
+  const back = () => route();
+  mount(siteNav(page, preview, h("div", { class: "site-tabs" }, h("button", { onclick: back }, "Form"), h("button", { class: "on" }, "About us"))),
+    h("div", { class: "site-body" }, h("div", { class: "site-main" }, aboutPage(page, back)), h("aside", { class: "site-ads", "aria-label": "Sponsored" }, adSlot(), adSlot())),
+    siteFooter(preview ? null : page.id));
+  document.body.classList.add("about-mode");
 }
 function aboutTeaser(page, open) {
   const a = page.brand.about;

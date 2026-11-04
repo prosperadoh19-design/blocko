@@ -9,10 +9,25 @@ const byIso = Object.fromEntries(COUNTRIES.map(c => [c.iso, c]));
 const byDial = [...COUNTRIES].sort((a, b) => b.dial.length - a.dial.length);
 const PREFER = { "1": "US", "7": "RU", "39": "IT", "44": "GB" };
 
+const TZ = { "Africa/Lagos": "NG", "Africa/Accra": "GH", "Africa/Nairobi": "KE", "Africa/Johannesburg": "ZA", "Africa/Cairo": "EG", "Africa/Casablanca": "MA", "Africa/Algiers": "DZ", "Africa/Tunis": "TN",
+  "Africa/Abidjan": "CI", "Africa/Dakar": "SN", "Africa/Douala": "CM", "Africa/Kinshasa": "CD", "Africa/Lubumbashi": "CD", "Africa/Kampala": "UG", "Africa/Dar_es_Salaam": "TZ", "Africa/Addis_Ababa": "ET",
+  "Africa/Kigali": "RW", "Africa/Lusaka": "ZM", "Africa/Harare": "ZW", "Africa/Maputo": "MZ", "Africa/Luanda": "AO", "Africa/Porto-Novo": "BJ", "Africa/Lome": "TG", "Africa/Niamey": "NE", "Africa/Bamako": "ML",
+  "Africa/Ouagadougou": "BF", "Africa/Freetown": "SL", "Africa/Monrovia": "LR", "Africa/Conakry": "GN", "Africa/Banjul": "GM", "Africa/Khartoum": "SD", "Africa/Windhoek": "NA", "Africa/Gaborone": "BW", "Africa/Libreville": "GA",
+  "Europe/London": "GB", "Europe/Dublin": "IE", "Europe/Paris": "FR", "Europe/Berlin": "DE", "Europe/Madrid": "ES", "Europe/Rome": "IT", "Europe/Amsterdam": "NL", "Europe/Brussels": "BE", "Europe/Lisbon": "PT", "Europe/Zurich": "CH",
+  "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Europe/Copenhagen": "DK", "Europe/Warsaw": "PL", "Europe/Istanbul": "TR", "Europe/Moscow": "RU", "Europe/Kyiv": "UA", "Europe/Kiev": "UA", "Europe/Athens": "GR",
+  "America/New_York": "US", "America/Chicago": "US", "America/Denver": "US", "America/Los_Angeles": "US", "America/Phoenix": "US", "America/Anchorage": "US", "Pacific/Honolulu": "US", "America/Toronto": "CA", "America/Vancouver": "CA",
+  "America/Mexico_City": "MX", "America/Sao_Paulo": "BR", "America/Argentina/Buenos_Aires": "AR", "America/Bogota": "CO", "America/Lima": "PE", "America/Santiago": "CL", "America/Jamaica": "JM", "America/Port_of_Spain": "TT",
+  "Asia/Dubai": "AE", "Asia/Riyadh": "SA", "Asia/Qatar": "QA", "Asia/Kuwait": "KW", "Asia/Kolkata": "IN", "Asia/Calcutta": "IN", "Asia/Karachi": "PK", "Asia/Dhaka": "BD", "Asia/Shanghai": "CN", "Asia/Hong_Kong": "HK",
+  "Asia/Tokyo": "JP", "Asia/Seoul": "KR", "Asia/Singapore": "SG", "Asia/Manila": "PH", "Asia/Jakarta": "ID", "Asia/Kuala_Lumpur": "MY", "Asia/Bangkok": "TH", "Australia/Sydney": "AU", "Australia/Melbourne": "AU", "Pacific/Auckland": "NZ" };
 export function guessCountry() {
   try {
     const saved = localStorage.getItem("blocko.country");
     if (saved && byIso[saved]) return saved;
+  } catch (e) {}
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    const c = TZ[tz];
+    if (c && byIso[c]) return c;
   } catch (e) {}
   for (const l of navigator.languages || [navigator.language || ""]) {
     const m = /-([A-Z]{2})$/i.exec(l || "");
