@@ -823,7 +823,7 @@ function aboutField(page, save) {
         h("input", { class: "input", value: st.value || "", placeholder: "500+", maxLength: 12, "aria-label": "Number", oninput: e => { st.value = e.target.value; save(); } }),
         h("input", { class: "input", value: st.label || "", placeholder: "Happy clients", maxLength: 40, "aria-label": "What it counts", oninput: e => { st.label = e.target.value; save(); } }),
         h("button", { class: "icon-btn", type: "button", "aria-label": "Remove", onclick: () => { list.splice(i, 1); save(); drawStats(); } }, "✕"))),
-        list.length < 4 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.stats = [...list, { value: "", label: "" }]; save(); drawStats(); } }, "+ Add a number") : null);
+        list.length < 4 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.stats = [...list, { value: "", label: "" }]; save(); drawStats(); } }, "+ Add a number") : "");
     };
     drawStats();
     // still picture
@@ -858,8 +858,8 @@ function aboutField(page, save) {
       slides.replaceChildren("Slideshow pictures",
         h("small", { class: "muted", style: { fontWeight: 400 } }, "These slide sideways on their own. Add up to 10, like past projects or events."),
         list.length ? h("div", { class: "slide-thumbs" }, list.map((u, i) => h("div", { class: "slide-thumb" }, h("img", { src: u, alt: "" }),
-          h("button", { type: "button", "aria-label": "Remove picture", onclick: () => { list.splice(i, 1); b.about.slides = list; save(); drawSlides(); } }, "✕")))) : null,
-        list.length < 10 ? h("div", null, add) : null);
+          h("button", { type: "button", "aria-label": "Remove picture", onclick: () => { list.splice(i, 1); b.about.slides = list; save(); drawSlides(); } }, "✕")))) : "",
+        list.length < 10 ? h("div", null, add) : "");
     };
     drawSlides();
     // links
@@ -872,16 +872,51 @@ function aboutField(page, save) {
           h("input", { class: "input", value: l.label || "", placeholder: "Button text, e.g. Instagram", maxLength: 40, "aria-label": "Button text", oninput: e => { l.label = e.target.value; save(); } }),
           h("input", { class: "input", type: "url", value: l.url || "", placeholder: "https://…", maxLength: 300, "aria-label": "Link", oninput: e => { l.url = e.target.value.trim(); save(); } }),
           h("button", { class: "icon-btn", type: "button", "aria-label": "Remove link", onclick: () => { list.splice(i, 1); save(); drawLinks(); } }, "✕"))),
-        list.length < 5 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.links = [...list, { label: "", url: "" }]; save(); drawLinks(); } }, "+ Add a link") : null);
+        list.length < 5 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.links = [...list, { label: "", url: "" }]; save(); drawLinks(); } }, "+ Add a link") : "");
     };
     drawLinks();
+    // photo gallery with categories
+    const CAT_MAX = 8, PER_CAT = 30;
+    const gallery = h("div", { class: "field" });
+    const drawGallery = () => {
+      const cats = b.about.gallery || [];
+      const card = (c, ci) => {
+        const add = h("button", { class: "btn small dark", type: "button", onclick: () => {
+          const i = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", multiple: true });
+          i.onchange = async () => {
+            const files = [...i.files].slice(0, PER_CAT - (c.images || []).length); if (!files.length) return toast("This category is full.");
+            add.disabled = true;
+            try { for (let k = 0; k < files.length; k++) { add.textContent = "Uploading " + (k + 1) + " of " + files.length + "…"; c.images = [...(c.images || []), await store.uploadMedia(await compressImage(files[k], 1600, false))]; save(); }
+              toast(files.length === 1 ? "Picture added" : files.length + " pictures added"); }
+            catch (e) { toast(e.message); }
+            drawGallery();
+          };
+          i.click();
+        } }, "+ Add pictures");
+        const imgs = c.images || [];
+        return h("div", { class: "gal-cat-ed" },
+          h("div", { class: "gal-cat-head" },
+            h("input", { class: "input", value: c.name || "", placeholder: "Category name, e.g. Projects", maxLength: 40, "aria-label": "Category name", oninput: e => { c.name = e.target.value; save(); } }),
+            h("button", { class: "icon-btn", type: "button", "aria-label": "Delete category", title: "Delete category", onclick: () => { if (imgs.length && !confirmInline(ci)) return; cats.splice(ci, 1); save(); drawGallery(); } }, "🗑")),
+          imgs.length ? h("div", { class: "slide-thumbs" }, imgs.map((u, i) => h("div", { class: "slide-thumb" }, h("img", { src: u, alt: "" }),
+            h("button", { type: "button", "aria-label": "Remove picture", onclick: () => { imgs.splice(i, 1); c.images = imgs; save(); drawGallery(); } }, "✕")))) : h("small", { class: "muted" }, "No pictures yet."),
+          h("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" } }, imgs.length < PER_CAT ? add : null, h("small", { class: "muted" }, imgs.length + " / " + PER_CAT)));
+      };
+      // deleting a category that has pictures needs a second tap
+      function confirmInline(ci) { if (gallery.__armed === ci) { gallery.__armed = null; return true; } gallery.__armed = ci; toast("Tap the bin again to delete this category and its pictures."); setTimeout(() => { if (gallery.__armed === ci) gallery.__armed = null; }, 4000); return false; }
+      gallery.replaceChildren("Photo gallery",
+        h("small", { class: "muted", style: { fontWeight: 400 } }, "Group your pictures, e.g. Projects, Products, Office, Events. Visitors can filter by category and tap a picture to see it big."),
+        ...cats.map(card),
+        cats.length < CAT_MAX ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.gallery = [...cats, { name: "", images: [] }]; save(); drawGallery(); } }, "+ Add a category") : "");
+    };
+    drawGallery();
     box.append(
       inp("name", "Company name", page.title || "e.g. Adoh Engineering Ltd", { max: 80 }),
       inp("tagline", "One-line summary", "e.g. Building safe roads across Lagos since 2012", { max: 120 }),
       inp("story", "What you do", "Tell people who you are, what you offer and who you serve.", { area: true, max: 1500 }),
       h("div", { class: "field" }, "Big numbers", h("small", { class: "muted", style: { fontWeight: 400 } }, "Like years in business, projects done or happy clients."), stats),
       inp("wins", "Achievements", "One per line, e.g.\nBest SME Award 2024\nCompleted the Ikeja bridge project", { area: true, max: 1200 }),
-      photo, slides, links,
+      photo, slides, gallery, links,
       inp("website", "Website", "https://", { type: "url", max: 200 }),
       inp("email", "Contact email", "hello@company.com", { type: "email", max: 120 }),
       inp("phone", "Phone or WhatsApp", "+234…", { type: "tel", max: 40 }),
@@ -1210,8 +1245,42 @@ async function viewForm(id, preview) {
   };
   await next();
 }
-function aboutOn(page) { const a = (page.brand || {}).about; return !!(a && a.on && (a.story || a.tagline || (a.stats || []).some(s => s.value) || a.wins || a.photo || (a.slides || []).length || (a.links || []).length)); }
+function aboutOn(page) { const a = (page.brand || {}).about; return !!(a && a.on && (a.story || a.tagline || (a.stats || []).some(s => s.value) || a.wins || a.photo || (a.slides || []).length || (a.links || []).length || (a.gallery || []).some(c => (c.images || []).length))); }
 const safeUrl = u => { try { const x = new URL(/^https?:\/\//i.test(u) ? u : "https://" + u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
+function galleryEl(cats) {
+  cats = cats.map(c => ({ name: (c.name || "").trim() || "Photos", images: c.images || [] })).filter(c => c.images.length);
+  if (!cats.length) return null;
+  let cur = "all";
+  const grid = h("div", { class: "gal-grid" });
+  const list = () => cur === "all" ? cats.flatMap(c => c.images.map(u => ({ u, cat: c.name }))) : cats[cur].images.map(u => ({ u, cat: cats[cur].name }));
+  const chips = cats.length > 1 ? h("div", { class: "gal-chips", role: "tablist" }) : null;
+  const draw = () => {
+    if (chips) chips.replaceChildren(...[["all", "All", cats.reduce((n, c) => n + c.images.length, 0)], ...cats.map((c, i) => [i, c.name, c.images.length])].map(([k, l, n]) =>
+      h("button", { class: cur === k ? "on" : "", role: "tab", onclick: () => { cur = k; draw(); } }, l, h("span", null, n))));
+    const items = list();
+    grid.replaceChildren(...items.map((it, i) => h("button", { class: "gal-item", "aria-label": "Open picture " + (i + 1) + " (" + it.cat + ")", onclick: () => lightbox(items, i) },
+      h("img", { src: it.u, alt: it.cat, loading: "lazy" }), cur === "all" && cats.length > 1 ? h("span", { class: "gal-tag" }, it.cat) : null)));
+  };
+  draw();
+  return h("section", null, h("h3", null, "Gallery"), chips, grid);
+}
+function lightbox(items, start) {
+  let i = start;
+  const img = h("img", { alt: "" }), cap = h("div", { class: "lb-cap" });
+  const paint = () => { img.src = items[i].u; img.alt = items[i].cat; cap.textContent = items[i].cat + " · " + (i + 1) + " of " + items.length; };
+  const step = d => { i = (i + d + items.length) % items.length; paint(); };
+  const close = () => { el.remove(); removeEventListener("keydown", key); };
+  const key = e => { if (e.key === "Escape") close(); if (e.key === "ArrowRight") step(1); if (e.key === "ArrowLeft") step(-1); };
+  let x0 = null;
+  const el = h("div", { class: "lightbox", role: "dialog", "aria-modal": "true", onclick: e => { if (e.target === el) close(); },
+    ontouchstart: e => { x0 = e.touches[0].clientX; }, ontouchend: e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1); x0 = null; } },
+    h("button", { class: "lb-close", "aria-label": "Close", onclick: close }, "✕"),
+    items.length > 1 ? h("button", { class: "lb-nav l", "aria-label": "Previous", onclick: () => step(-1) }, "‹") : null,
+    img,
+    items.length > 1 ? h("button", { class: "lb-nav r", "aria-label": "Next", onclick: () => step(1) }, "›") : null,
+    cap);
+  paint(); document.body.append(el); addEventListener("keydown", key);
+}
 function slideshow(urls, color) {
   const track = h("div", { class: "slides-track" }, urls.map(u => h("div", { class: "slide" }, h("img", { src: u, alt: "", loading: "lazy" }))));
   const dots = h("div", { class: "slides-dots" }, urls.map((_, i) => h("button", { "aria-label": "Picture " + (i + 1), onclick: () => goTo(i) })));
@@ -1247,6 +1316,7 @@ function aboutPage(page, back) {
     a.photo ? h("img", { class: "about-photo", src: a.photo, alt: "", loading: "lazy" }) : null,
     (a.slides || []).length ? slideshow(a.slides, "#141318") : null,
     a.story ? h("section", null, h("h3", null, "What we do"), h("div", { class: "about-story" }, linkify(a.story))) : null,
+    galleryEl(a.gallery || []),
     wins.length ? h("section", null, h("h3", null, "What we've achieved"), h("ul", { class: "about-wins" }, wins.map(w => h("li", null, h("span", { class: "tick" }, "✓"), w)))) : null,
     contacts.length ? h("section", null, h("h3", null, "Get in touch"), h("div", { class: "about-contacts" }, contacts)) : null,
     linkBtns.length ? h("section", null, h("h3", null, "Links"), h("div", { class: "about-links" }, linkBtns)) : null,

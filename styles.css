@@ -597,3 +597,23 @@ body.about-mode .site-nav{background:#fff;border-bottom:1px solid #e6e6ea}
 body.about-mode .about-page{margin-top:32px}
 .about-stats{border-top:0}
 body.about-mode .about-teaser{display:none}
+/* v16: categorised gallery */
+.gal-cat-ed{border:1px solid #e6e6ea;border-radius:12px;padding:12px;display:grid;gap:10px;background:#fff}
+.gal-cat-head{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.gal-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.gal-chips button{border:1px solid #e1e1e6;background:#fff;color:#33333a;border-radius:999px;padding:8px 14px;font:600 14px/1 var(--body,inherit);cursor:pointer;display:flex;gap:6px;align-items:center}
+.gal-chips button span{color:#8a8a93;font-weight:500;font-size:12px}
+.gal-chips button.on{background:#141318;color:#fff;border-color:#141318}
+.gal-chips button.on span{color:#c9c9d0}
+.gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+@media (max-width:520px){.gal-grid{grid-template-columns:repeat(2,1fr)}}
+.gal-item{position:relative;aspect-ratio:4/3;border:0;padding:0;border-radius:8px;overflow:hidden;background:#f3f3f5;cursor:zoom-in}
+.gal-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.gal-item:hover img{transform:scale(1.04)}
+.gal-tag{position:absolute;left:8px;bottom:8px;background:rgba(20,19,24,.75);color:#fff;font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px}
+.lightbox{position:fixed;inset:0;z-index:1000;background:rgba(10,10,12,.94);display:flex;align-items:center;justify-content:center;padding:56px 16px}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px}
+.lb-close{position:absolute;top:14px;right:14px;width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:18px;cursor:pointer}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:30px;cursor:pointer}
+.lb-nav.l{left:14px}.lb-nav.r{right:14px}
+.lb-cap{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#d6d6dc;font-size:14px}
