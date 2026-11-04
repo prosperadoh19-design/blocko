@@ -1753,15 +1753,15 @@ Object.assign(SHOW, {
           btn.disabled = true; btn.textContent = "Uploading…";
           try { b.photo = await store.uploadMedia(await compressImage(f, 1200, false)); save(); drawPhoto(); } catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Upload"; } }) }, b.photo ? "Change" : "Upload");
         photo.replaceChildren(h("div", { class: "brand-thumb" }, b.photo ? h("img", { src: b.photo, alt: "" }) : h("span", null, "Photo")),
-          h("div", { class: "brand-acts" }, h("b", null, "Artist photo"), h("small", { class: "muted" }, "A tall portrait photo looks best."), h("div", { style: { display: "flex", gap: "6px" } }, btn, b.photo ? h("button", { class: "btn small", type: "button", onclick: () => { b.photo = ""; save(); drawPhoto(); } }, "Remove") : "")));
+          h("div", { class: "brand-acts" }, h("b", null, b.kind === "label" ? "Label photo" : "Artist photo"), h("small", { class: "muted" }, b.kind === "label" ? "Your team, studio or logo. A tall photo looks best." : "A tall portrait photo looks best."), h("div", { style: { display: "flex", gap: "6px" } }, btn, b.photo ? h("button", { class: "btn small", type: "button", onclick: () => { b.photo = ""; save(); drawPhoto(); } }, "Remove") : "")));
       };
       drawPhoto();
       g.append(h("div", { class: "field" }, "This page is for", tickGroup([["artist", "🎤 An artist"], ["label", "💿 A record label"]], b.kind || "artist", k => { b.kind = k; save(); g.replaceChildren(); SHOW.profile.edit(b, g, save); }, "Page is for")),
         photo,
         lbl("Top banner text (optional)", fld(b, "badge", 'e.g. New album "Lagos Nights" out now', save, { max: 70 })),
-        lbl("Headline", fld(b, "headline", "e.g. Afrobeats from Lagos to the world.", save, { max: 90 })),
+        lbl("Headline", fld(b, "headline", b.kind === "label" ? "e.g. Home of the next Afrobeats stars." : "e.g. Afrobeats from Lagos to the world.", save, { max: 90 })),
         lbl("Bio", fld(b, "bio", "Who you are, your sound, your story. Use an empty line to start a new paragraph.", save, { area: true, max: 2000, h: "140px" })),
-        h("div", { class: "sc-row2" }, lbl("Based in", fld(b, "location", "Lagos, NG", save)), lbl(b.kind === "label" ? "Founded by / CEO" : "Label", fld(b, "label", b.kind === "label" ? "e.g. Ade Bello" : "Independent", save)), lbl("Active since", fld(b, "since", "2019", save, { max: 10 }))),
+        h("div", { class: "sc-row2" }, lbl("Based in", fld(b, "location", "Lagos, NG", save)), lbl(b.kind === "label" ? "Founded by / CEO" : "Label", fld(b, "label", b.kind === "label" ? "e.g. Ade Bello" : "Independent", save)), lbl(b.kind === "label" ? "Founded" : "Active since", fld(b, "since", "2019", save, { max: 10 }))),
         lbl("Genres (separate with commas)", fld(b, "genres", "Afrobeats, R&B, Amapiano", save, { max: 80 })),
         h("div", { class: "field" }, "Big numbers (up to 3)", listEditor(b, "stats", 3, "Add a number", it => h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 2fr" } }, fld(it, "value", "4.8M+", save, { max: 12 }), fld(it, "label", "Monthly listeners", save, { max: 30 })), () => ({ value: "", label: "" }), save)),
         h("div", { class: "field" }, "Achievements (up to 6)", listEditor(b, "highlights", 6, "Add an achievement", it => h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "e.g. Best New Artist", save, { max: 40 }), fld(it, "sub", "e.g. Headies Awards 2025", save, { max: 60 })), () => ({ title: "", sub: "" }), save)),
