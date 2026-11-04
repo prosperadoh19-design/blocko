@@ -1063,7 +1063,7 @@ async function viewForm(id, preview) {
         catch (err) { showErr(err.message); }
         send.disabled = false; send.textContent = "Continue";
       } }, field("gem", "Email address", em), send);
-      const head = h("div", { class: "lg-head" }, h("div", { class: "lg-ic" }, "👤"), h("h2", null, "Sign in to continue"), h("p", { class: "lg-sub" }, "Enter your email and we'll send you a 6-digit code. No password needed."));
+      const head = h("div", { class: "lg-head" }, h("div", { class: "lg-ic" }, "👤"), h("h2", null, "Sign in to continue"), h("p", { class: "lg-sub" }, store.mode === "cloud" ? "Enter your email and we'll send you a sign-in link. No password needed." : "Enter your email and we'll send you a 6-digit code. No password needed."));
       const showCode = (email, demoCode, isLink) => {
         const digits = Array.from({ length: 6 }, (_, i) => h("input", { class: "otp", inputMode: "numeric", autocomplete: i ? "off" : "one-time-code", maxLength: 6, "aria-label": "Digit " + (i + 1) }));
         const ok = primary("Verify and continue");
