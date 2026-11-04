@@ -250,7 +250,10 @@ class CloudStore {
   async uploadAudio(file) {
     if (file.size > LIMITS.audio) throw new Error("Songs must be under 25 MB. Try an MP3 or M4A file.");
     const path = `${this.ws.id}/${uuid()}-${safeName(file.name)}`;
-    this.check(await this.sb.storage.from("audio").upload(path, file, { contentType: file.type || "audio/mpeg" }));
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    const guess = { mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", ogg: "audio/ogg", opus: "audio/ogg", flac: "audio/flac", amr: "audio/amr", "3gp": "audio/3gpp", webm: "audio/webm", wma: "audio/x-ms-wma" }[ext];
+    const type = (file.type && file.type.startsWith("audio/") ? file.type.split(";")[0] : guess) || "audio/mpeg";
+    this.check(await this.sb.storage.from("audio").upload(path, file, { contentType: type }));
     return { path, name: file.name, size: file.size, type: file.type };
   }
   async audioUrl(path) { return this.check(await this.sb.storage.from("audio").createSignedUrl(path, 3600)).signedUrl; }

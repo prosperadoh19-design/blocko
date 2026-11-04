@@ -770,3 +770,4 @@ body.about-mode .about-teaser{display:none}
 .tick-opt{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);cursor:pointer;font-weight:600;font-size:14px}
 .tick-opt input{width:18px;height:18px;accent-color:var(--brand);margin:0}
 .tick-opt.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--paper))}
+.trk-add{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}

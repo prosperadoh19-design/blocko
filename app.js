@@ -1543,31 +1543,34 @@ const SHOW = {
       const MAXT = 30;
       const drawTracks = () => {
         const list = b.tracks || (b.tracks = []);
-        const add = h("button", { class: "btn small dark", type: "button", onclick: () => {
-          const i = h("input", { type: "file", accept: "audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac", multiple: true });
+        const pick = (multi, btn) => {
+          const i = h("input", { type: "file", accept: "audio/*,.mp3,.m4a,.wav,.aac,.ogg,.opus,.flac,.amr", multiple: multi });
           i.onchange = async () => {
             const files = [...i.files].slice(0, MAXT - list.length); if (!files.length) return;
-            add.disabled = true;
+            btn.disabled = true; let ok = 0;
             for (let k = 0; k < files.length; k++) {
               const f = files[k];
-              if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(f.name)) { toast(f.name + " isn't a song file."); continue; }
-              add.textContent = "Uploading " + (k + 1) + " of " + files.length + "…";
+              if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|wav|aac|ogg|opus|flac|amr|3gp|webm)$/i.test(f.name)) { toast(f.name + " isn't a song file."); continue; }
+              btn.lastChild.textContent = files.length > 1 ? "Uploading " + (k + 1) + " of " + files.length + "…" : "Uploading…";
               try { const dur = await audioDuration(f); const up = await store.uploadAudio(f);
-                list.push({ id: uuid(), title: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim(), path: up.path, dur: Math.round(dur) || 0 }); save(); drawTracks(); }
-              catch (e) { toast(e.message); }
+                list.push({ id: uuid(), title: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim(), path: up.path, dur: Math.round(dur) || 0 }); ok++; save(); }
+              catch (e) { toast("Couldn't add " + f.name + ": " + e.message); }
             }
             drawTracks();
+            if (ok) toast(ok === 1 ? "Song added. This release has " + list.length + " song" + (list.length === 1 ? "" : "s") + "." : ok + " songs added. This release has " + list.length + " songs.");
           };
           i.click();
-        } }, "+ Add songs");
+        };
+        const addOne = h("button", { class: "btn small dark", type: "button", onclick: () => pick(false, addOne) }, icon("plus"), h("span", null, list.length ? "Add another song" : "Add a song"));
+        const addMany = h("button", { class: "btn small", type: "button", onclick: () => pick(true, addMany) }, icon("plus"), h("span", null, "Add several at once"));
         tracks.replaceChildren(
           ...list.map((t, ti) => h("div", { class: "trk-ed" }, h("span", { class: "trk-n" }, ti + 1),
             h("input", { class: "input", value: t.title || "", placeholder: "Song title", maxLength: 80, "aria-label": "Song " + (ti + 1) + " title", oninput: e => { t.title = e.target.value; save(); } }),
             h("span", { class: "muted trk-d" }, fmtTime(t.dur)),
             h("button", { class: "icon-btn", type: "button", "aria-label": "Move up", disabled: ti === 0, onclick: () => { [list[ti - 1], list[ti]] = [list[ti], list[ti - 1]]; save(); drawTracks(); } }, icon("up")),
             h("button", { class: "icon-btn", type: "button", "aria-label": "Remove song", onclick: () => { list.splice(ti, 1); save(); drawTracks(); } }, icon("x")))),
-          list.length ? "" : h("small", { class: "muted" }, "No songs yet. MP3 or M4A, up to 25 MB each."),
-          list.length < MAXT ? h("div", null, add) : "");
+          list.length ? h("small", { class: "muted" }, list.length + " song" + (list.length === 1 ? "" : "s") + " in this release · up to " + MAXT) : h("small", { class: "muted" }, "No songs yet. MP3, M4A, WAV and other audio files, up to 25 MB each."),
+          list.length < MAXT ? h("div", { class: "trk-add" }, addOne, addMany) : "");
       };
       drawTracks();
       g.append(scHeadingInput(b, "Music", save),
@@ -1575,7 +1578,7 @@ const SHOW = {
           h("label", { class: "field" }, "Album / EP / single name", h("input", { class: "input", value: b.title || "", placeholder: "e.g. Lagos Nights", maxLength: 80, oninput: e => { b.title = e.target.value; save(); } })),
           h("label", { class: "field" }, "Year", h("input", { class: "input", value: b.year || "", placeholder: "2026", maxLength: 4, inputMode: "numeric", oninput: e => { b.year = e.target.value; save(); } }))),
         h("div", { class: "field" }, "Type", tickGroup(["Album", "EP", "Single", "Mixtape"].map(k => [k, k]), b.kind || "Album", k => { b.kind = k; save(); }, "Release type")),
-        cover, h("div", { class: "field" }, "Songs", h("small", { class: "muted", style: { fontWeight: 400 } }, "Add as many songs as you like: pick several at once, or tap + Add songs again. Listeners can play them, with no download button."), tracks),
+        cover, h("div", { class: "field" }, "Songs", h("small", { class: "muted", style: { fontWeight: 400 } }, "Add as many songs as you like, one by one or several at once. Listeners can play them, with no download button."), tracks),
         h("div", { class: "field" }, "More music", h("button", { class: "add-btn", type: "button", style: { justifySelf: "start" }, onclick: () => window.__addBlockAfter && window.__addBlockAfter(b.id, "album") }, icon("plus"), "Add another album, EP or single")));
     },
     view(b) {
@@ -2164,6 +2167,9 @@ async function doInstall() {
   addEventListener("hashchange", route);
   route();
   if ("serviceWorker" in navigator && location.protocol === "https:" && window.top === window) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    navigator.serviceWorker.register("sw.js").then(reg => { setInterval(() => reg.update().catch(() => {}), 30 * 60e3); }).catch(() => {});
+    let reloaded = false;
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
   }
 })();

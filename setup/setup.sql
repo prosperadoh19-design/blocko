@@ -329,7 +329,7 @@ grant execute on function public.ad_event(uuid, text) to anon, authenticated;
 -------------------------------------------------- music on artist pages (v7)
 -- audio: private bucket. Team members upload songs; listeners only get links that expire after 1 hour.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-  values ('audio', 'audio', false, 26214400, array['audio/mpeg','audio/mp3','audio/mp4','audio/x-m4a','audio/aac','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/flac'])
+  values ('audio', 'audio', false, 26214400, array['audio/*'])
   on conflict (id) do nothing;
 do $$ begin if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='team uploads audio') then
 create policy "team uploads audio" on storage.objects for insert to authenticated
