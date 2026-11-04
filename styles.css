@@ -506,3 +506,37 @@ td .file-chip{max-width:240px}
 .ads-stats{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .ads-stats b{color:var(--ink);font-variant-numeric:tabular-nums}
 @media (max-width:700px){.ads-row{grid-template-columns:1fr}}
+
+/* v13: About us page */
+.site-tabs{display:flex;gap:4px;background:var(--c-paper,#f2f1f6);border-radius:999px;padding:4px;margin-left:8px}
+.site-tabs button{border:0;background:transparent;font:700 14px/1 var(--body,inherit);padding:9px 14px;border-radius:999px;cursor:pointer;color:inherit;white-space:nowrap}
+.site-tabs button.on{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+@media (max-width:700px){.site-nav-in{flex-wrap:wrap}.site-tabs{order:3;flex:1 0 100%;margin:4px 0 0}.site-tabs button{flex:1}}
+.about-teaser{background:#fff;border-radius:18px;padding:18px;display:grid;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:14px}
+.about-teaser small{text-transform:uppercase;letter-spacing:.08em;font-weight:700;opacity:.55;font-size:11px}
+.about-teaser b{font:800 18px/1.2 var(--display)}
+.about-teaser p{margin:0;opacity:.75;font-size:14px}
+.about-teaser .btn{justify-self:start;margin-top:4px}
+.about-page{background:#fff;border-radius:24px;padding:clamp(20px,4vw,40px);display:grid;gap:28px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-top:24px}
+.about-hero{display:flex;gap:18px;align-items:center}
+.about-logo{width:72px;height:72px;object-fit:contain;border-radius:16px;background:#f6f5f9;padding:8px;flex:none}
+.about-emoji{font-size:52px;flex:none}
+.about-hero small{text-transform:uppercase;letter-spacing:.1em;font-weight:700;opacity:.55;font-size:12px}
+.about-hero h2{margin:2px 0 4px;font:800 clamp(26px,4vw,38px)/1.1 var(--display)}
+.about-hero p{margin:0;font-size:17px;opacity:.75}
+.about-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.about-stat{background:#f6f5f9;border-radius:18px;padding:18px;display:grid;gap:4px}
+.about-stat b{font:800 clamp(28px,4vw,36px)/1 var(--display)}
+.about-stat span{font-size:14px;opacity:.7;font-weight:600}
+.about-photo{width:100%;max-height:380px;object-fit:cover;border-radius:18px}
+.about-page h3{margin:0 0 10px;font:800 20px/1.2 var(--display)}
+.about-story{white-space:pre-line;font-size:17px;line-height:1.6}
+.about-wins{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.about-wins li{display:flex;gap:12px;align-items:flex-start;font-size:16px;line-height:1.45}
+.about-wins .tick{flex:none;width:24px;height:24px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:800;margin-top:1px}
+.about-contacts{display:flex;flex-wrap:wrap;gap:10px}
+.about-contacts a,.about-contacts span{background:#f6f5f9;border-radius:999px;padding:10px 16px;font-weight:600;text-decoration:none;color:inherit;font-size:15px;word-break:break-word}
+.about-back{border-top:1px solid #eee;padding-top:20px}
+.about-box{display:grid;gap:10px}
+.about-stats-ed{display:grid;gap:8px}
+.about-stat-ed{display:grid;grid-template-columns:72px 1fr auto;gap:6px;align-items:center}

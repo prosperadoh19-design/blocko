@@ -744,6 +744,7 @@ async function viewEditor(id) {
     h("h3", null, "Page settings"),
     h("div", { class: "field" }, "Color", colorRow),
     brandBox,
+    aboutField(page, save),
     h("label", { class: "field" }, "Message after someone submits", thanks),
     accessBox,
     alertsField(page),
@@ -798,6 +799,59 @@ function brandSettings(page, refresh, save) {
     slot("Logo", "logo", { max: 512, alpha: true, hint: "Square or wide, PNG with see-through background looks best.", empty: "Logo" }),
     coverSlot, gallery, modeBox);
   return box;
+}
+
+/* ---- "About us" page: an optional company page shown beside the published form ---- */
+function aboutField(page, save) {
+  const b = page.brand;
+  const box = h("div", { class: "field about-box" });
+  const draw = () => {
+    const a = b.about || {};
+    const tick = h("label", { class: "access-opt" + (a.on ? " on" : "") }, h("input", { type: "checkbox", checked: !!a.on, onchange: e => {
+      b.about = { ...(b.about || {}), on: e.target.checked }; save(); draw();
+    } }), h("span", null, h("b", null, "Show an About page"), h("small", null, "People filling the form can open a page about your company: what you do, what you've achieved, how to reach you.")));
+    box.replaceChildren(h("span", { style: { display: "flex", gap: "6px", alignItems: "center" } }, "🏢 About your company"), tick);
+    if (!a.on) return;
+    const set = (k, v) => { b.about[k] = v; save(); };
+    const inp = (k, label, ph, opts = {}) => h("label", { class: "field" }, label,
+      h(opts.area ? "textarea" : "input", { class: opts.area ? "textarea" : "input", value: a[k] || "", placeholder: ph, maxLength: opts.max || 120, type: opts.type || "text", style: opts.area ? { minHeight: "90px" } : null, oninput: e => set(k, e.target.value) }));
+    // stats: up to 4 big numbers
+    const stats = h("div", { class: "about-stats-ed" });
+    const drawStats = () => {
+      const list = b.about.stats || [];
+      stats.replaceChildren(...list.map((st, i) => h("div", { class: "about-stat-ed" },
+        h("input", { class: "input", value: st.value || "", placeholder: "500+", maxLength: 12, "aria-label": "Number", oninput: e => { st.value = e.target.value; save(); } }),
+        h("input", { class: "input", value: st.label || "", placeholder: "Happy clients", maxLength: 40, "aria-label": "What it counts", oninput: e => { st.label = e.target.value; save(); } }),
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Remove", onclick: () => { list.splice(i, 1); save(); drawStats(); } }, "✕"))),
+        list.length < 4 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.stats = [...list, { value: "", label: "" }]; save(); drawStats(); } }, "+ Add a number") : null);
+    };
+    drawStats();
+    // photo
+    const photo = h("div", { class: "brand-slot" });
+    const drawPhoto = () => {
+      const btn = h("button", { class: "btn small dark", type: "button", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => {
+        btn.disabled = true; btn.textContent = "Uploading…";
+        try { b.about.photo = await store.uploadMedia(await compressImage(f, 1400, false)); save(); drawPhoto(); toast("Photo added"); }
+        catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Upload"; }
+      }) }, b.about.photo ? "Change" : "Upload");
+      photo.replaceChildren(h("div", { class: "brand-thumb cover" }, b.about.photo ? h("img", { src: b.about.photo, alt: "" }) : h("span", null, "Photo")),
+        h("div", { class: "brand-acts" }, h("b", null, "Team or office photo"), h("small", { class: "muted" }, "Optional."),
+          h("div", { style: { display: "flex", gap: "6px" } }, btn, b.about.photo ? h("button", { class: "btn small", type: "button", onclick: () => { delete b.about.photo; save(); drawPhoto(); } }, "Remove") : null)));
+    };
+    drawPhoto();
+    box.append(
+      inp("name", "Company name", page.title || "e.g. Adoh Engineering Ltd", { max: 80 }),
+      inp("tagline", "One-line summary", "e.g. Building safe roads across Lagos since 2012", { max: 120 }),
+      inp("story", "What you do", "Tell people who you are, what you offer and who you serve.", { area: true, max: 1500 }),
+      h("div", { class: "field" }, "Big numbers", h("small", { class: "muted", style: { fontWeight: 400 } }, "Like years in business, projects done or happy clients."), stats),
+      inp("wins", "Achievements", "One per line, e.g.\nBest SME Award 2024\nCompleted the Ikeja bridge project", { area: true, max: 1200 }),
+      photo,
+      inp("website", "Website", "https://", { type: "url", max: 200 }),
+      inp("email", "Contact email", "hello@company.com", { type: "email", max: 120 }),
+      inp("phone", "Phone or WhatsApp", "+234…", { type: "tel", max: 40 }),
+      inp("address", "Address", "Office address", { max: 200 }));
+  };
+  draw(); return box;
 }
 
 function accessField(page, save, onChange) {
@@ -878,9 +932,19 @@ async function viewForm(id, preview) {
     markEl(page),
     h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null));
   const closed = !preview && !page.accepting;
-  const site = (topBarEl, main) => (header.firstChild && (header.firstChild.style.maxWidth = "1120px"), mount(pageBg(page), topBarEl, siteNav(page, preview), header,
-    h("div", { class: "site-body" }, h("div", { class: "site-main" }, main), h("aside", { class: "site-ads", "aria-label": "Sponsored" }, adSlot(), adSlot())),
-    siteFooter(preview ? null : page.id)));
+  const about = aboutOn(page) ? page.brand.about : null;
+  const site = (topBarEl, main) => {
+    if (header.firstChild) header.firstChild.style.maxWidth = "1120px";
+    const slot = h("div", { class: "site-main" }, main);
+    let tab = "form";
+    const show = t => { tab = t; slot.replaceChildren(t === "about" ? aboutPage(page, () => show("form")) : main); tabs && tabs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === t)); if (t === "about") slot.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    const tabs = about ? h("div", { class: "site-tabs", role: "tablist" },
+      h("button", { class: "on", "data-t": "form", role: "tab", onclick: () => show("form") }, "📝 Form"),
+      h("button", { "data-t": "about", role: "tab", onclick: () => show("about") }, "🏢 About us")) : null;
+    mount(pageBg(page), topBarEl, siteNav(page, preview, tabs), header,
+      h("div", { class: "site-body" }, slot, h("aside", { class: "site-ads", "aria-label": "Sponsored" }, about ? aboutTeaser(page, () => show("about")) : null, adSlot(), adSlot())),
+      siteFooter(preview ? null : page.id));
+  };
   const body = h("div", { class: "form-page" });
   page.blocks.forEach(b => {
     if (b.type === "heading") return body.append(h("div", { class: "fblock heading" }, h("h2", null, b.text)));
@@ -1110,10 +1174,38 @@ async function viewForm(id, preview) {
   };
   await next();
 }
-function siteNav(page, preview) {
+function aboutOn(page) { const a = (page.brand || {}).about; return !!(a && a.on && (a.story || a.tagline || (a.stats || []).some(s => s.value) || a.wins)); }
+const safeUrl = u => { try { const x = new URL(/^https?:\/\//i.test(u) ? u : "https://" + u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
+function aboutTeaser(page, open) {
+  const a = page.brand.about;
+  return h("div", { class: "about-teaser" }, h("small", null, "About"), h("b", null, a.name || page.title || "Us"),
+    a.tagline ? h("p", null, a.tagline) : null, h("button", { class: "btn small", onclick: open }, "Learn about us →"));
+}
+function aboutPage(page, back) {
+  const a = page.brand.about, b = page.brand;
+  const stats = (a.stats || []).filter(s => s.value || s.label);
+  const wins = (a.wins || "").split("\n").map(x => x.trim()).filter(Boolean);
+  const web = a.website && safeUrl(a.website);
+  const contacts = [
+    web ? h("a", { href: web, target: "_blank", rel: "noopener" }, "🌐 ", web.replace(/^https?:\/\//, "").replace(/\/$/, "")) : null,
+    a.email ? h("a", { href: "mailto:" + a.email }, "✉️ ", a.email) : null,
+    a.phone ? h("a", { href: "tel:" + a.phone.replace(/[^\d+]/g, "") }, "📞 ", a.phone) : null,
+    a.address ? h("span", null, "📍 ", a.address) : null].filter(Boolean);
+  return h("article", { class: "about-page" },
+    h("div", { class: "about-hero" }, b.logo ? h("img", { class: "about-logo", src: b.logo, alt: "" }) : h("span", { class: "about-emoji" }, page.emoji || "🏢"),
+      h("div", null, h("small", null, "About us"), h("h2", null, a.name || page.title || "About us"), a.tagline ? h("p", null, a.tagline) : null)),
+    stats.length ? h("div", { class: "about-stats" }, stats.map(s => h("div", { class: "about-stat" }, h("b", { style: { color: page.color } }, s.value), h("span", null, s.label)))) : null,
+    a.photo ? h("img", { class: "about-photo", src: a.photo, alt: "", loading: "lazy" }) : null,
+    a.story ? h("section", null, h("h3", null, "What we do"), h("div", { class: "about-story" }, linkify(a.story))) : null,
+    wins.length ? h("section", null, h("h3", null, "What we've achieved"), h("ul", { class: "about-wins" }, wins.map(w => h("li", null, h("span", { class: "tick", style: { background: page.color } }, "✓"), w)))) : null,
+    contacts.length ? h("section", null, h("h3", null, "Get in touch"), h("div", { class: "about-contacts" }, contacts)) : null,
+    h("div", { class: "about-back" }, h("button", { class: "btn brand", style: { background: page.color, borderColor: page.color }, onclick: back }, "← Back to the form")));
+}
+function siteNav(page, preview, tabs) {
   const b = page.brand || {};
   return h("nav", { class: "site-nav" }, h("div", { class: "site-nav-in" },
     h("div", { class: "site-brand" }, b.logo ? h("img", { src: b.logo, alt: "" }) : h("span", { class: "e" }, page.emoji || "📝"), h("b", null, page.title || "Untitled page")),
+    tabs,
     h("div", { class: "spacer" }),
     preview ? h("span", { class: "pill draft" }, "Preview") : null,
     h("a", { class: "btn small dark site-cta", href: location.pathname + "#home" }, "Create a free form")));
