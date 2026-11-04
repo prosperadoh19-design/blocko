@@ -56,10 +56,18 @@ function linkify(text) {
 /* ============================================================ content model */
 const BACKGROUNDS = [["Sunset", "sunset"], ["Ocean", "ocean"], ["City night", "city"], ["Colors", "colors"],
   ["Gold waves", "gold-waves"], ["Gold silk", "silk"], ["Gold dust", "atelier"], ["Rose gold", "rose-gold"], ["Emerald", "emerald-waves"], ["Royal blue", "royal-blue"],
-  ["Neon glow", "neon"], ["Stage lights", "stage"], ["Concert", "concert"], ["Vinyl", "vinyl"], ["Turntable", "turntable"], ["Equalizer", "equalizer"],
-  ["Sound waves", "sound-waves"], ["Studio mic", "studio-mic"], ["Headphones", "headphones"], ["Neon notes", "neon-music"], ["Aurora", "aurora"], ["Sunset city", "sunset-sky"], ["Desert", "dunes"], ["Forest", "forest"],
+  ["Neon glow", "neon"], ["Aurora", "aurora"], ["Sunset city", "sunset-sky"], ["Desert", "dunes"], ["Forest", "forest"],
   ["Ankara", "ankara"], ["Gold lines", "geometric"], ["Smoke", "black-marble"], ["Clouds", "marble"], ["Linen", "linen"], ["Office", "office"]]
   .map(([n, f]) => [n, "backgrounds/" + f + ".jpg", "backgrounds/thumbs/" + f + ".jpg"]);
+// real photos of music places and instruments (free Unsplash photos, shown from Unsplash's servers)
+const UNSPLASH = (id, w = 2000, h) => "https://images.unsplash.com/photo-" + id + "?auto=format&fit=crop&w=" + w + (h ? "&h=" + h : "") + "&q=75";
+const MUSIC_PHOTOS = { stage: "1470229722913-7c0e2dbbafd3", crowd: "1506157786151-b8491531f063", emptyStage: "1576514129883-2f1d47a65da6", smoke: "1761998535969-11ca31e89f78",
+  studio: "1598488035139-bdbb2231ce04", mic: "1478737270239-2f02b77fc618", mixer: "1574517947730-55cb23e608c2", dj: "1571266028243-d220c6a7edbf", guitar: "1761211846277-d8b1e3ce1e97",
+  guitarWall: "1511379938547-c1f69419868d", piano: "1520523839897-bd0b52f945a0", drums: "1461784121038-f088ca1e7714", sax: "1415201364774-f6f0bb35f28f", turntable: "1603048588665-791ca8aea617",
+  vinyl: "1580656449278-e8381933522c", djSilhouette: "1470225620780-dba8ba36b745", band: "1524368535928-5b5e00ddc76b", concert: "1459749411175-04bf5292ceea", drummer: "1588032786045-59cefda005c0", micBokeh: "1511671782779-c97d3d27a1d4" };
+BACKGROUNDS.push(...[["Concert lights", "stage"], ["Festival crowd", "crowd"], ["Empty stage", "emptyStage"], ["Smoky stage", "smoke"], ["Recording studio", "studio"], ["Studio mic", "mic"],
+  ["Mixing desk", "mixer"], ["DJ decks", "dj"], ["Neon guitar", "guitar"], ["Guitar wall", "guitarWall"], ["Piano", "piano"], ["Drums", "drums"], ["Saxophone", "sax"], ["Turntable", "turntable"], ["Vinyl", "vinyl"]]
+  .map(([n, k]) => [n, UNSPLASH(MUSIC_PHOTOS[k]), UNSPLASH(MUSIC_PHOTOS[k], 300, 200)]));
 const COLORS = ["#7b3ff2", "#ff5a1f", "#ff3e9a", "#1f6bff", "#00b86b", "#00a7a7", "#e0a800", "#141318"];
 const EMOJIS = "📝 📋 🎉 💼 🚀 💬 ⭐ 🛒 🎟️ 📅 🍕 ❤️ 🏆 🎨 🎵 📚 💡 🧾 🏠 🧑‍💻 🤝 📣 ✈️ 🌱 ⚽ 🧪 💰 📦 🔔 ✅".split(" ");
 const TYPES = {
@@ -363,21 +371,21 @@ const TEMPLATES = {
       Q("consent", "I understand that work starts after the deposit is paid.", { required: true })] },
 
   artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Show yourself off: a web page with your music, tour dates, videos, photos, credits and booking contacts. Comes with sample pictures you can replace.",
-    brand: { layout: "artist", cover: "backgrounds/stage.jpg", coverMode: "header", tint: 0.5 },
+    brand: { layout: "artist", cover: UNSPLASH(MUSIC_PHOTOS.stage), coverMode: "header", tint: 0.5 },
     title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria. Write one line about your sound here.",
     blocks: () => [
-      { ...SHOW.profile.make(), photo: "samples/artist/artist-photo.jpg", badge: 'New single out now', headline: "Write a strong headline about your music.",
+      { ...SHOW.profile.make(), photo: UNSPLASH(MUSIC_PHOTOS.djSilhouette, 1000, 1250), badge: 'New single out now', headline: "Write a strong headline about your music.",
         bio: "Write your story here: where you're from, your sound and what makes your music different.\n\nAdd a second paragraph about your biggest shows, collaborations or your newest project.",
         location: "Lagos, NG", label: "Independent", since: String(new Date().getFullYear() - 3), genres: "Afrobeats, R&B",
         stats: [{ value: "250K+", label: "Monthly listeners" }, { value: "3M+", label: "Total streams" }, { value: "40", label: "Shows played" }],
         highlights: [{ title: "Best New Artist", sub: "Sample award 2025" }, { title: "Top 10", sub: "Sample chart" }, { title: "Sold-out show", sub: "Sample venue" }] },
-      { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()), cover: "samples/artist/cover-1.jpg" },
-      { ...SHOW.album.make(), title: "Your single", kind: "Single", year: String(new Date().getFullYear() - 1), cover: "samples/artist/cover-3.jpg" },
-      { ...SHOW.album.make(), title: "Your EP", kind: "EP", year: String(new Date().getFullYear() - 2), cover: "samples/artist/cover-2.jpg" },
+      { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()), cover: UNSPLASH(MUSIC_PHOTOS.vinyl, 800, 800) },
+      { ...SHOW.album.make(), title: "Your single", kind: "Single", year: String(new Date().getFullYear() - 1), cover: UNSPLASH(MUSIC_PHOTOS.guitar, 800, 800) },
+      { ...SHOW.album.make(), title: "Your EP", kind: "EP", year: String(new Date().getFullYear() - 2), cover: UNSPLASH(MUSIC_PHOTOS.sax, 800, 800) },
       { ...SHOW.links.make(), items: ["Spotify", "Apple Music", "Audiomack", "Boomplay", "YouTube", "Instagram", "TikTok"].map(label => ({ label, url: "" })) },
       { ...SHOW.tour.make(), items: [{ city: "", venue: "", date: "", time: "", status: "", url: "" }] },
       SHOW.video.make(),
-      { ...SHOW.gallery.make(), images: ["gallery-3", "gallery-1", "gallery-2", "gallery-4", "cover-4"].map(n => "samples/artist/" + n + ".jpg") },
+      { ...SHOW.gallery.make(), images: ["concert", "band", "drummer", "micBokeh", "crowd"].map(k => UNSPLASH(MUSIC_PHOTOS[k], 1600)) },
       SHOW.work.make()] },
 
   fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample pictures you can replace.",
@@ -839,7 +847,7 @@ async function viewEditor(id) {
     if (b.type === "heading") g.append(h("input", { class: "input", value: b.text, placeholder: "Section title", "aria-label": "Heading text", style: { fontWeight: 800, fontSize: "22px" }, oninput: e => { b.text = e.target.value; save(); } }));
     else if (b.type === "text") { const ta = h("textarea", { class: "textarea", value: b.text, placeholder: "Write anything: instructions, details, terms. Links become clickable.", "aria-label": "Text", oninput: e => { b.text = e.target.value; save(); } }); g.append(ta); }
     else if (SHOW[b.type]) {
-      if (JSON.stringify(b).includes('"samples/')) g.append(h("div", { class: "sample-note" }, "✨ These are sample pictures so you can see how the page looks. Tap a picture or its Change button to replace it with yours, or Delete/✕ to remove it."));
+      if (/"samples\/|images\.unsplash\.com/.test(JSON.stringify(b))) g.append(h("div", { class: "sample-note" }, "✨ These are sample pictures so you can see how the page looks. Tap a picture or its Change button to replace it with yours, or Delete/✕ to remove it."));
       SHOW[b.type].edit(b, g, save);
     }
     else if (b.type === "divider") g.append(h("hr", { style: { border: 0, borderTop: "3px solid var(--line)", width: "100%" } }));
