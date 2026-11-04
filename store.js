@@ -12,6 +12,7 @@ const SAVE_FIELDS = [...PUBLIC_FIELDS, "workspace_id"];
 const pick = (p, keys) => Object.fromEntries(keys.filter(k => k in p).map(k => [k, p[k]]));
 const safeName = n => String(n || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").slice(-80);
 const readDataUrl = file => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("Couldn't read that file.")); r.readAsDataURL(file); });
+const shortCode = () => { const a = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; for (let i = 0; i < 6; i++) s += a[Math.floor(Math.random() * a.length)]; return s; };
 export const TERMS_VERSION = "2026-11-03";
 export const LIMITS = { image: 5 * 1024 * 1024, file: 10 * 1024 * 1024, audio: 25 * 1024 * 1024 };
 
@@ -64,7 +65,8 @@ class DemoStore {
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   }
   async getPage(id) { return this.data.pages[id] ? structuredClone(this.data.pages[id]) : null; }
-  async getPublicPage(id) { const p = this.data.pages[id]; return p && p.published ? structuredClone(p) : null; }
+  async getPublicPage(id) { const p = this.data.pages[id] || Object.values(this.data.pages).find(x => x.slug === id); return p && p.published ? structuredClone(p) : null; }
+  async pageSlug(id) { const p = this.data.pages[id]; if (!p) return null; if (!p.slug) { p.slug = shortCode(); this.persist(); } return p.slug; }
   async savePage(page) {
     const now = new Date().toISOString();
     const before = this.data.pages[page.id];
@@ -199,7 +201,11 @@ class CloudStore {
     return rows.map(r => ({ ...r, response_count: (r.responses && r.responses[0] && r.responses[0].count) || 0 }));
   }
   async getPage(id) { return this.check(await this.sb.from("pages").select("*").eq("id", id).maybeSingle()); }
-  async getPublicPage(id) { return this.check(await this.sb.from("pages").select(PUBLIC_FIELDS.join(",")).eq("id", id).eq("published", true).maybeSingle()); }
+  async getPublicPage(id) {
+    const col = /^[0-9a-f-]{36}$/i.test(id) ? "id" : "slug";
+    return this.check(await this.sb.from("pages").select(PUBLIC_FIELDS.join(",")).eq(col, id).eq("published", true).maybeSingle());
+  }
+  async pageSlug(id) { try { const r = await this.sb.from("pages").select("slug").eq("id", id).maybeSingle(); return r.error || !r.data ? null : r.data.slug; } catch (e) { return null; } }
   async savePage(page) {
     const body = { ...pick(page, SAVE_FIELDS), workspace_id: page.workspace_id || this.ws.id, updated_at: new Date().toISOString() };
     delete body.created_at;

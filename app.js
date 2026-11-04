@@ -561,23 +561,25 @@ function emojiSheet(onPick) {
   sheet((b, close) => b.append(h("h2", null, "Pick an icon"),
     h("div", { class: "emoji-grid" }, EMOJIS.map(e => h("button", { onclick: () => { onPick(e); close(); } }, e)))));
 }
-function shareUrl(id) { return location.origin + location.pathname + "#f-" + id; }
+function shareUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "#f-" + id; }
 async function shareSheet(page, onChange, opts = {}) {
   sheet((b, close) => {
-    const link = h("input", { class: "input", readOnly: true, value: shareUrl(page.id), "aria-label": "Form link" });
+    let key = page.slug || page.id;
+    const link = h("input", { class: "input", readOnly: true, value: shareUrl(key), "aria-label": "Form link" });
     const pub = h("input", { type: "checkbox", checked: page.published });
     const acc = h("input", { type: "checkbox", checked: page.accepting });
     const qrBox = h("div", { class: "qr" });
     const drawQr = () => {
       qrBox.replaceChildren();
       if (!window.qrcode) { qrBox.hidden = true; return; }
-      const q = window.qrcode(0, "M"); q.addData(shareUrl(page.id)); q.make();
+      const q = window.qrcode(0, "M"); q.addData(shareUrl(key)); q.make();
       const n = q.getModuleCount(), s = 4, pad = 4, cv = h("canvas", { width: (n + pad * 2) * s, height: (n + pad * 2) * s });
       const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.fillStyle = "#141318";
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) ctx.fillRect((c + pad) * s, (r + pad) * s, s, s);
       qrBox.append(cv, h("div", null, h("b", null, "Scan to open"), h("div", { class: "muted", style: { fontSize: "14px" } }, "Print it on posters, flyers or a counter card. Right-click or long-press to save the image.")));
     };
     loadQr().then(drawQr);
+    if (!page.slug) store.pageSlug(page.id).then(sl => { if (sl) { page.slug = key = sl; link.value = shareUrl(sl); if (window.qrcode) drawQr(); } });
     const sync = async () => {
       try {
         const r = await store.setPublished(page.id, pub.checked, acc.checked);

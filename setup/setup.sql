@@ -348,3 +348,19 @@ do $$ begin if not exists (select 1 from pg_policies where schemaname='storage' 
 create policy "team reads audio" on storage.objects for select to authenticated
   using (bucket_id = 'audio' and exists (select 1 from public.members m where m.workspace_id::text = (storage.foldername(name))[1] and m.user_id = auth.uid()));
 end if; end $$;
+
+-------------------------------------------------- v8: short share links (#f-k3x9pq)
+alter table public.pages add column if not exists slug text;
+create or replace function public.make_slug() returns text language plpgsql as $$
+declare a text := 'abcdefghjkmnpqrstuvwxyz23456789'; s text; begin
+  loop
+    s := ''; for i in 1..6 loop s := s || substr(a, 1 + floor(random() * length(a))::int, 1); end loop;
+    exit when not exists (select 1 from public.pages where slug = s);
+  end loop; return s; end $$;
+create or replace function public.pages_set_slug() returns trigger language plpgsql as $$
+begin if new.slug is null or new.slug = '' then new.slug := public.make_slug(); end if; return new; end $$;
+do $$ begin if not exists (select 1 from pg_trigger where tgname = 'pages_slug_trg') then
+  create trigger pages_slug_trg before insert or update on public.pages for each row execute function public.pages_set_slug();
+end if; end $$;
+update public.pages set slug = public.make_slug() where slug is null;
+create unique index if not exists pages_slug_idx on public.pages (slug);
