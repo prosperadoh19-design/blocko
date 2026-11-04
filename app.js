@@ -54,7 +54,11 @@ function linkify(text) {
 }
 
 /* ============================================================ content model */
-const BACKGROUNDS = [["Sunset", "backgrounds/sunset.jpg"], ["Ocean", "backgrounds/ocean.jpg"], ["City night", "backgrounds/city.jpg"], ["Colors", "backgrounds/colors.jpg"]];
+const BACKGROUNDS = [["Sunset", "sunset"], ["Ocean", "ocean"], ["City night", "city"], ["Colors", "colors"],
+  ["Gold waves", "gold-waves"], ["Gold silk", "silk"], ["Gold dust", "atelier"], ["Rose gold", "rose-gold"], ["Emerald", "emerald-waves"], ["Royal blue", "royal-blue"],
+  ["Neon glow", "neon"], ["Stage lights", "stage"], ["Aurora", "aurora"], ["Sunset city", "sunset-sky"], ["Desert", "dunes"], ["Forest", "forest"],
+  ["Ankara", "ankara"], ["Gold lines", "geometric"], ["Smoke", "black-marble"], ["Clouds", "marble"], ["Linen", "linen"], ["Office", "office"]]
+  .map(([n, f]) => [n, "backgrounds/" + f + ".jpg", "backgrounds/thumbs/" + f + ".jpg"]);
 const COLORS = ["#7b3ff2", "#ff5a1f", "#ff3e9a", "#1f6bff", "#00b86b", "#00a7a7", "#e0a800", "#141318"];
 const EMOJIS = "📝 📋 🎉 💼 🚀 💬 ⭐ 🛒 🎟️ 📅 🍕 ❤️ 🏆 🎨 🎵 📚 💡 🧾 🏠 🧑‍💻 🤝 📣 ✈️ 🌱 ⚽ 🧪 💰 📦 🔔 ✅".split(" ");
 const TYPES = {
@@ -958,9 +962,9 @@ function brandSettings(page, refresh, save) {
   const gallery = h("div", { class: "bg-gallery" });
   let coverSlot;
   const drawGallery = () => gallery.replaceChildren(h("small", { class: "muted", style: { gridColumn: "1/-1" } }, "Or pick a ready-made background:"),
-    ...BACKGROUNDS.map(([name, url]) => h("button", { class: "bg-pick" + (b.cover === url ? " on" : ""), type: "button", title: name, "aria-label": "Use the " + name + " background",
+    ...BACKGROUNDS.map(([name, url, thumb]) => h("button", { class: "bg-pick" + (b.cover === url ? " on" : ""), type: "button", title: name, "aria-label": "Use the " + name + " background",
       onclick: () => { b.cover = url; if (b.tint == null) b.tint = 0.35; refresh(); save(); const n = slot("Background image", "cover", coverOpts); coverSlot.replaceWith(n); coverSlot = n; drawGallery(); drawMode(); } },
-      h("img", { src: url, alt: "" }), h("span", null, name))));
+      h("img", { src: thumb, alt: "", loading: "lazy" }), h("span", null, name))));
   const coverOpts = { max: 1800, alpha: false, hint: "A wide photo of your shop, team or product.", empty: "Photo" };
   coverSlot = slot("Background image", "cover", coverOpts);
   drawGallery();
@@ -1098,7 +1102,7 @@ function layoutField(page, save) {
   const box = h("div", { class: "field" });
   const draw = () => {
     const cur = ["artist", "fashion"].includes(page.brand.layout) ? page.brand.layout : "standard";
-    box.replaceChildren("Page style", h("div", { class: "seg small" }, [["standard", "Standard"], ["artist", "🎤 Artist website"], ["fashion", "👗 Fashion house"]].map(([k, l]) =>
+    box.replaceChildren("Page style", h("div", { class: "seg small layout-seg" }, [["standard", "Standard"], ["artist", "🎤 Artist website"], ["fashion", "👗 Fashion house"]].map(([k, l]) =>
       h("button", { class: cur === k ? "on" : "", type: "button", onclick: () => { if (k !== "standard") page.brand.layout = k; else delete page.brand.layout; save(); draw(); toast(k === "artist" ? "Artist website style on. Tap Preview to see it." : k === "fashion" ? "Fashion house style on. Tap Preview to see it." : "Standard style on."); if (window.__syncStatic) window.__syncStatic(); } }, l))),
       h("small", { class: "muted", style: { fontWeight: 400 } }, cur === "artist" ? "A dark website to show yourself off: big header, profile, music, tour, videos, photos, credits, contacts and a player bar. Your background image fills the header." : cur === "fashion" ? "A black-and-gold luxury website: big header, brand story, lookbook with collections and prices, runway photos, boutiques and order buttons." : "The normal Blocko page."));
   };
