@@ -1,4 +1,6 @@
 import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
+// never print "null"/"false" when an optional piece of the screen is left out
+for (const m of ["append", "replaceChildren", "prepend"]) { const orig = Element.prototype[m]; Element.prototype[m] = function (...n) { return orig.apply(this, n.filter(x => x != null && x !== false)); }; }
 
 /* ============================================================ helpers */
 const $app = document.getElementById("app");
@@ -627,7 +629,8 @@ async function viewEditor(id) {
         h("button", { class: "icon-btn", "aria-label": "Preview", title: "Preview", onclick: () => go("v-" + page.id) }, icon("eye")),
         h("button", { class: "btn small light", onclick: () => shareSheet(page, null) }, icon("share"), "Share"))),
     emojiBtn, title, desc,
-    h("div", { class: "tabs" }, h("button", { class: "on" }, "Build"), h("button", { onclick: () => go("r-" + page.id) }, "Responses", countEl))));
+    h("div", { class: "tabs" }, h("button", { class: "on" }, "Build"), h("button", { onclick: () => go("r-" + page.id) }, "Responses", countEl),
+      h("button", { class: "tab-about", onclick: () => { aboutBox.scrollIntoView({ behavior: "smooth", block: "start" }); aboutBox.classList.add("flash"); setTimeout(() => aboutBox.classList.remove("flash"), 1600); } }, "🏢 About"))));
 
   const list = h("div", { class: "blocks" });
   const render = () => {
@@ -732,6 +735,7 @@ async function viewEditor(id) {
   } })));
   const thanks = h("textarea", { class: "textarea", style: { minHeight: "80px" }, value: page.thank_you || "", placeholder: "Thanks! We got your answers.", oninput: e => { page.thank_you = e.target.value; save(); } });
   const brandBox = brandSettings(page, refreshLook, save);
+  const aboutBox = aboutField(page, save);
   const accessBox = accessField(page, save, () => drawLock());
   function drawLock() {
     const a = page.access || "open";
@@ -744,7 +748,7 @@ async function viewEditor(id) {
     h("h3", null, "Page settings"),
     h("div", { class: "field" }, "Color", colorRow),
     brandBox,
-    aboutField(page, save),
+    aboutBox,
     h("label", { class: "field" }, "Message after someone submits", thanks),
     accessBox,
     alertsField(page),
@@ -943,7 +947,7 @@ function accessField(page, save, onChange) {
       opt(open, "Anyone with the link", open ? "On: no sign-in or code needed." : "Off while a lock below is on. Tick to remove the locks.", e => { if (e.target.checked) setFlags({ code: false, email: false }); else { e.target.checked = true; toast("Turn on a lock below instead."); } }),
       opt(f.code, "People with an access code", "They type a code you share.", e => setFlags({ ...f, code: e.target.checked })),
       opt(f.email, "People who sign in", "A login screen: email + 6-digit code.", e => setFlags({ ...f, email: e.target.checked })),
-      f.code && f.email ? h("div", { class: "access-both" }, "Both locks on: visitors sign in first, then enter the code.") : null);
+      f.code && f.email ? h("div", { class: "access-both" }, "Both locks on: visitors sign in first, then enter the code.") : "");
     extra.replaceChildren();
     if (f.code) {
       const inp = h("input", { class: "input", id: "acode", maxLength: 20, placeholder: "e.g. STAFF2026", autocomplete: "off", style: { fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" } });

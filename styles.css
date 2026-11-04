@@ -667,3 +667,5 @@ body.about-mode .about-teaser{display:none}
 .ad-card.house{background:#fff;border:1px solid #e6e6ea;border-radius:12px}
 .ad-card.house .ad-cta{color:#141318;text-decoration:underline;text-underline-offset:3px}
 .ad-card.house .ad-tag{color:#8a8a93}
+.tabs .tab-about{margin-left:auto}
+@media (max-width:520px){.tabs .tab-about{margin-left:0}}
