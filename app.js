@@ -349,7 +349,7 @@ function shell(color, barRight, ...content) {
 }
 function topBar(left, right) { return h("div", { class: "bar" }, left, h("div", { class: "spacer" }), right); }
 function logo() { return h("button", { class: "logo", onclick: () => go("home"), "aria-label": "Blocko home" }, h("span", { class: "mk" }, h("i"), h("i"), h("i"), h("i")), "Blocko"); }
-function mount(...nodes) { $app.replaceChildren(...nodes.flat(9).filter(Boolean)); window.scrollTo(0, 0); }
+function mount(...nodes) { document.body.classList.remove("about-mode"); $app.replaceChildren(...nodes.flat(9).filter(Boolean)); window.scrollTo(0, 0); }
 
 /* ============================================================ sheets */
 function sheet(build) {
@@ -973,10 +973,10 @@ async function viewForm(id, preview) {
     if (header.firstChild) header.firstChild.style.maxWidth = "1120px";
     const slot = h("div", { class: "site-main" }, main);
     let tab = "form";
-    const show = t => { tab = t; slot.replaceChildren(t === "about" ? aboutPage(page, () => show("form")) : main); tabs && tabs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === t)); if (t === "about") slot.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    const show = t => { tab = t; header.hidden = t === "about"; document.body.classList.toggle("about-mode", t === "about"); slot.replaceChildren(t === "about" ? aboutPage(page, () => show("form")) : main); tabs && tabs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === t)); window.scrollTo(0, 0); };
     const tabs = about ? h("div", { class: "site-tabs", role: "tablist" },
-      h("button", { class: "on", "data-t": "form", role: "tab", onclick: () => show("form") }, "📝 Form"),
-      h("button", { "data-t": "about", role: "tab", onclick: () => show("about") }, "🏢 About us")) : null;
+      h("button", { class: "on", "data-t": "form", role: "tab", onclick: () => show("form") }, "Form"),
+      h("button", { "data-t": "about", role: "tab", onclick: () => show("about") }, "About us")) : null;
     mount(pageBg(page), topBarEl, siteNav(page, preview, tabs), header,
       h("div", { class: "site-body" }, slot, h("aside", { class: "site-ads", "aria-label": "Sponsored" }, about ? aboutTeaser(page, () => show("about")) : null, adSlot(), adSlot())),
       siteFooter(preview ? null : page.id));
@@ -1239,18 +1239,18 @@ function aboutPage(page, back) {
     a.email ? h("a", { href: "mailto:" + a.email }, "✉️ ", a.email) : null,
     a.phone ? h("a", { href: "tel:" + a.phone.replace(/[^\d+]/g, "") }, "📞 ", a.phone) : null,
     a.address ? h("span", null, "📍 ", a.address) : null].filter(Boolean);
-  const linkBtns = (a.links || []).slice(0, 5).map(l => { const u = l.url && safeUrl(l.url); return u ? h("a", { class: "about-link", href: u, target: "_blank", rel: "noopener", style: { background: page.color } }, (l.label || u.replace(/^https?:\/\//, "").replace(/\/$/, "")), " ↗") : null; }).filter(Boolean);
+  const linkBtns = (a.links || []).slice(0, 5).map(l => { const u = l.url && safeUrl(l.url); return u ? h("a", { class: "about-link", href: u, target: "_blank", rel: "noopener" }, h("span", null, l.label || u.replace(/^https?:\/\//, "").replace(/\/$/, "")), h("i", null, "↗")) : null; }).filter(Boolean);
   return h("article", { class: "about-page" },
     h("div", { class: "about-hero" }, b.logo ? h("img", { class: "about-logo", src: b.logo, alt: "" }) : h("span", { class: "about-emoji" }, page.emoji || "🏢"),
       h("div", null, h("small", null, "About us"), h("h2", null, a.name || page.title || "About us"), a.tagline ? h("p", null, a.tagline) : null)),
-    stats.length ? h("div", { class: "about-stats" }, stats.map(s => h("div", { class: "about-stat" }, h("b", { style: { color: page.color } }, s.value), h("span", null, s.label)))) : null,
+    stats.length ? h("div", { class: "about-stats" }, stats.map(s => h("div", { class: "about-stat" }, h("b", null, s.value), h("span", null, s.label)))) : null,
     a.photo ? h("img", { class: "about-photo", src: a.photo, alt: "", loading: "lazy" }) : null,
-    (a.slides || []).length ? slideshow(a.slides, page.color) : null,
+    (a.slides || []).length ? slideshow(a.slides, "#141318") : null,
     a.story ? h("section", null, h("h3", null, "What we do"), h("div", { class: "about-story" }, linkify(a.story))) : null,
-    wins.length ? h("section", null, h("h3", null, "What we've achieved"), h("ul", { class: "about-wins" }, wins.map(w => h("li", null, h("span", { class: "tick", style: { background: page.color } }, "✓"), w)))) : null,
+    wins.length ? h("section", null, h("h3", null, "What we've achieved"), h("ul", { class: "about-wins" }, wins.map(w => h("li", null, h("span", { class: "tick" }, "✓"), w)))) : null,
     contacts.length ? h("section", null, h("h3", null, "Get in touch"), h("div", { class: "about-contacts" }, contacts)) : null,
     linkBtns.length ? h("section", null, h("h3", null, "Links"), h("div", { class: "about-links" }, linkBtns)) : null,
-    h("div", { class: "about-back" }, h("button", { class: "btn brand", style: { background: page.color, borderColor: page.color }, onclick: back }, "← Back to the form")));
+    h("div", { class: "about-back" }, h("button", { class: "about-backbtn", onclick: back }, "← Back to the form")));
 }
 function siteNav(page, preview, tabs) {
   const b = page.brand || {};
