@@ -1,4 +1,5 @@
 import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
+import { phoneField, phoneOk } from "./phone.js";
 // never print "null"/"false" when an optional piece of the screen is left out
 for (const m of ["append", "replaceChildren", "prepend"]) { const orig = Element.prototype[m]; Element.prototype[m] = function (...n) { return orig.apply(this, n.filter(x => x != null && x !== false)); }; }
 
@@ -672,7 +673,7 @@ async function viewEditor(id) {
         else if (b.type === "yesno") card.append(h("div", { class: "fake" }, "Yes  ·  No"));
         else if (b.type === "scale") card.append(h("div", { class: "fake" }, Array.from({ length: b.max || 10 }, (_, i) => i + 1).join("  ·  ")), (b.lowLabel || b.highLabel) ? h("div", { class: "help" }, (b.lowLabel || "") + " … " + (b.highLabel || "")) : null);
         else if (b.type === "consent") card.append(h("div", { class: "opts" }, h("div", { class: "opt" }, h("i", { class: "sq" }), b.label || "I agree")));
-        else card.append(h("div", { class: "fake" + (b.type === "long" || b.type === "signature" || b.type === "address" ? " tall" : "") }, { dropdown: "Choose…", long: "Long answer", email: "name@example.com", phone: "Phone number", number: "0", date: "dd / mm / yyyy", time: "--:--", datetime: "dd / mm / yyyy  --:--", url: "https://…", address: "Street, city, state, country", short: "Short answer", signature: "✍  Sign here",
+        else card.append(h("div", { class: "fake" + (b.type === "long" || b.type === "signature" || b.type === "address" ? " tall" : "") }, { dropdown: "Choose…", long: "Long answer", email: "name@example.com", phone: "🇳🇬 +234 ▾   Phone number", number: "0", date: "dd / mm / yyyy", time: "--:--", datetime: "dd / mm / yyyy  --:--", url: "https://…", address: "Street, city, state, country", short: "Short answer", signature: "✍  Sign here",
           file: "⇪  Upload " + (b.multiple ? "up to 5 files" : "a file") + " (up to 10 MB each)", imageup: "🖼  Upload " + (b.multiple ? "up to 5 photos" : "a photo"), docup: "📄  Upload " + (b.multiple ? "up to 5 documents" : "a document") + " (PDF, Word, Excel…)" }[b.type]));
       }
       return card;
@@ -923,7 +924,7 @@ function aboutField(page, save) {
       photo, slides, gallery, links,
       inp("website", "Website", "https://", { type: "url", max: 200 }),
       inp("email", "Contact email", "hello@company.com", { type: "email", max: 120 }),
-      inp("phone", "Phone or WhatsApp", "+234…", { type: "tel", max: 40 }),
+      h("label", { class: "field" }, "Phone or WhatsApp", phoneField(h, { value: a.phone || "", onChange: v => set("phone", v) })),
       inp("address", "Address", "Office address", { max: 200 }));
   };
   draw(); return box;
@@ -1032,7 +1033,8 @@ async function viewForm(id, preview) {
     const ctrl = h("div", { class: "ctrl" });
     const set = v => { answers[b.id] = v; box.classList.remove("err"); const m = box.querySelector(".msg"); if (m) m.remove(); };
     switch (b.type) {
-      case "short": case "email": case "phone": case "number": case "date": case "time": case "datetime": case "url":
+      case "phone": ctrl.append(phoneField(h, { id: fid, disabled: closed, onChange: v => set(v) })); break;
+      case "short": case "email": case "number": case "date": case "time": case "datetime": case "url":
         ctrl.append(h("input", { class: "input", id: fid, type: { short: "text", email: "email", phone: "tel", number: "number", date: "date", time: "time", datetime: "datetime-local", url: "url" }[b.type], placeholder: b.type === "url" ? "https://…" : null,
           inputMode: b.type === "phone" ? "tel" : b.type === "url" ? "url" : null, autocomplete: b.type === "email" ? "email" : b.type === "phone" ? "tel" : b.type === "url" ? "url" : null, maxLength: 500, disabled: closed,
           oninput: e => set(e.target.value), onblur: e => { if (b.type === "url" && e.target.value && !/^https?:\/\//i.test(e.target.value)) { e.target.value = "https://" + e.target.value.trim(); set(e.target.value); } } })); break;
@@ -1106,6 +1108,7 @@ async function viewForm(id, preview) {
       let msg = null;
       if (b.required && empty) msg = "Please answer this question.";
       else if (!empty && b.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = "Enter a valid email, like name@example.com.";
+      else if (!empty && b.type === "phone" && !phoneOk(v)) msg = "Enter a full phone number, and check the country is right.";
       else if (!empty && b.type === "number" && isNaN(Number(v))) msg = "Enter a number.";
       else if (!empty && b.type === "url" && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v)) msg = "Enter a full web address, like https://example.com.";
       else if (b.required && b.type === "consent" && v !== "Agreed") msg = "Please tick the box to continue.";

@@ -1,6 +1,6 @@
 // Keeps the app shell available offline so it opens instantly like an installed app.
-const CACHE = "blocko-v23";
-const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./store.js", "./config.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
+const CACHE = "blocko-v24";
+const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./store.js", "./phone.js", "./config.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
