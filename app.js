@@ -666,13 +666,12 @@ function viewLogin() {
     } catch (err) { msg.replaceChildren(h("div", { class: "err-box" }, err.message)); }
     btn.disabled = false;
   } }, title, sub, msg, h("label", { class: "field", for: "em" }, "Email", email), h("label", { class: "field", for: "pw" }, "Password", pw), agreeRow, btn, swap);
-  const shapes = h("div", { class: "shapes" },
-    h("i", { style: { width: "180px", height: "180px", background: "var(--c-orange)", right: "-30px", top: "60px", transform: "rotate(14deg)" } }),
-    h("i", { style: { width: "120px", height: "120px", background: "var(--c-yellow)", right: "140px", bottom: "40px", transform: "rotate(-10deg)" } }),
-    h("i", { style: { width: "90px", height: "90px", background: "var(--c-pink)", left: "40%", top: "38%", borderRadius: "50%" } }));
+  const shapes = h("div", { class: "shapes photo" },
+    h("div", { class: "lg-shot a", style: { backgroundImage: "url(" + JSON.stringify(TEMPLATES.artist.brand.cover) + ")" } }, h("span", null, "Music artist website")),
+    h("div", { class: "lg-shot b", style: { backgroundImage: "url(" + JSON.stringify(TEMPLATES.fashion.brand.cover) + ")" } }, h("span", null, "Fashion brand website")));
   mount(h("div", { class: "login" },
     h("div", { class: "login-art" }, shapes, h("div", { class: "logo", style: { position: "relative" } }, h("span", { class: "mk" }, h("i"), h("i"), h("i"), h("i")), "Blocko"),
-      h("h1", null, "Pages that tell. Forms that collect.")),
+      h("div", { class: "lg-copy" }, h("span", { class: "hero-eyebrow" }, "Websites · Showcases · Forms"), h("h1", null, "Build pages that ", h("em", null, "sell your story"), "."), h("p", null, "Music and fashion websites, business forms and more. Free to build and publish."))),
     h("div", { class: "login-form" }, form)));
 }
 
