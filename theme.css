@@ -217,3 +217,38 @@ hr{border-color:var(--line)!important}
 .colors button[style*="#141318"]{box-shadow:inset 0 0 0 2px #475569}
 .sc-prev-cover{background:var(--field);color:#64748b}
 .sc-prev-cover.empty{border:1px dashed #334155}
+
+/* ---------- home: professional layout (v47) ---------- */
+.hero-eyebrow{display:inline-block;margin-top:34px;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#a5b4fc}
+.band h1.hero-h{font-size:clamp(34px,5.2vw,58px);line-height:1.05;margin-top:10px;max-width:760px;text-shadow:none;letter-spacing:-.02em}
+.band h1.hero-h em{font-style:normal;background:linear-gradient(90deg,#8B5CF6,#06B6D4);-webkit-background-clip:text;background-clip:text;color:transparent}
+.band::after{display:none}
+.tpl{border-radius:10px;border-width:1px;height:46px;padding:0 18px}
+.tpl .e{background:transparent;width:auto;height:auto;color:inherit}
+.tpl .e svg{width:18px;height:18px}
+.tpl:not(.primary){background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.18)}
+.sec-head{margin:46px 0 18px}
+.sec-head .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8B5CF6}
+.sec-head h2{font-family:var(--display);font-size:clamp(24px,3vw,32px);font-weight:700;margin:6px 0 0;color:#fff;letter-spacing:-.01em}
+.sec-head p{margin:6px 0 0;max-width:620px}
+.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.fcard{position:relative;min-height:340px;border-radius:14px;overflow:hidden;background-size:cover;background-position:center;text-align:left;color:#fff;border:1px solid rgba(255,255,255,.08);transition:transform .25s,border-color .25s}
+.fcard:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.25)}
+.fcard-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,13,19,.05) 0%,rgba(11,13,19,.55) 45%,rgba(11,13,19,.94) 100%)}
+.fcard-in{position:absolute;left:0;right:0;bottom:0;padding:26px}
+.fcard-tag{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#cbd5e1}
+.fcard h3{font-family:var(--display);font-size:26px;font-weight:700;margin:8px 0 10px;color:#fff}
+.fcard ul{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.fcard li{font-size:12.5px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px)}
+.fcard-go{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.fcard-go svg{width:16px;height:16px;transition:transform .2s}
+.fcard:hover .fcard-go svg{transform:translateX(4px)}
+.fcard:nth-child(2) .fcard-go{color:#e7c75f}
+.tgal>.sec-head{margin-top:56px}
+.tgal h3{font-size:11.5px;letter-spacing:.14em;margin:26px 0 10px}
+.tcard.pro{border-radius:12px!important}
+.tcard.pro .tcard-body{padding:18px;gap:6px}
+.tcard-ic{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.25);color:#c4b5fd;margin-bottom:6px}
+.tcard-ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tcard.pro .tmeta span{border-radius:6px}
+@media (max-width:720px){.feat-grid{grid-template-columns:1fr}.fcard{min-height:300px}.hero-eyebrow{margin-top:22px}}

@@ -34,7 +34,19 @@ const I = {
   image: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>', clip: '<path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L15 7.5"/>',
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>', chev: '<path d="m6 9 6 6 6-6"/>'
 };
-const icon = n => svg(I[n]);
+Object.assign(I, {
+  c_business: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  c_hr: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M21 20c0-2.6-1.6-4.8-4-5.6"/>',
+  c_events: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  c_surveys: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  c_property: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10M10 20v-6h4v6"/>',
+  c_fashion: '<path d="M8 3l4 3 4-3 5 4-3 4-2-1v11H8V10l-2 1-3-4z"/>',
+  c_music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+  c_start: '<path d="M12 5v14M5 12h14"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>'
+});
+const CAT_ICON = { "Business": "c_business", "HR & team": "c_hr", "Events": "c_events", "Surveys": "c_surveys", "Property": "c_property", "Fashion": "c_fashion", "Music": "c_music" };
+const icon = n => svg(I[n] || I.plus);
 let toastT;
 function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2600); }
 const ago = iso => {
@@ -674,19 +686,39 @@ async function viewHome() {
     h("button", { class: "icon-btn", "aria-label": "Team", title: "Team", onclick: teamSheet }, icon("team")),
     store.mode === "cloud" ? h("button", { class: "icon-btn", "aria-label": "Account", onclick: accountSheet }, icon("user")) : null);
   const total = pages.reduce((a, p) => a + (p.response_count || 0), 0);
-  const greeting = (() => { const hr = new Date().getHours(); return hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening"; })();
+  const FEATURED = ["artist", "fashion"];
   const tplBtns = [h("button", { class: "tpl primary", onclick: () => newPage("blank") }, h("span", { class: "e" }, icon("plus")), "Blank page"),
-    h("button", { class: "tpl", onclick: () => document.getElementById("templates").scrollIntoView({ behavior: "smooth" }) }, h("span", { class: "e" }, "✨"), "Browse " + (Object.keys(TEMPLATES).length - 1) + " templates")];
+    h("button", { class: "tpl", onclick: () => document.getElementById("templates").scrollIntoView({ behavior: "smooth" }) }, "All templates", h("span", { class: "e ghost" }, icon("arrow")))];
+  const featured = h("section", { class: "feat" },
+    h("div", { class: "sec-head" }, h("span", { class: "eyebrow" }, "Featured"), h("h2", null, "Showcase websites"), h("p", { class: "muted" }, "Full websites for creatives, ready in minutes. Sample photos and content are included, so swap in your own and publish.")),
+    h("div", { class: "feat-grid" }, FEATURED.map(k => {
+      const t = TEMPLATES[k];
+      const tag = k === "artist" ? "Music · Artists & labels" : "Fashion · Designers & brands";
+      const pts = k === "artist" ? ["Stream-only music player", "Tour dates & videos", "Booking form"] : ["Lookbook with prices", "WhatsApp orders", "Boutiques & contact"];
+      return h("button", { class: "fcard", onclick: () => newPage(k), style: { backgroundImage: "url(" + JSON.stringify(t.brand.cover) + ")" } },
+        h("div", { class: "fcard-shade" }),
+        h("div", { class: "fcard-in" },
+          h("span", { class: "fcard-tag" }, tag),
+          h("h3", null, k === "artist" ? "Music artist website" : "Fashion brand website"),
+          h("ul", null, pts.map(x => h("li", null, x))),
+          h("span", { class: "fcard-go" }, "Use this template", icon("arrow"))));
+    })));
   const cats = [...new Set(Object.values(TEMPLATES).filter(t => t.cat !== "Start").map(t => t.cat))];
-  const gallery = h("section", { id: "templates", class: "tgal" }, h("h2", null, "Start from a template"),
-    h("p", { class: "muted" }, "Ready-made forms with the right questions already in place. Change anything you like."),
-    cats.map(c => [h("h3", null, c), h("div", { class: "tgrid" }, Object.entries(TEMPLATES).filter(([, t]) => t.cat === c).map(([k, t]) => {
-      const n = t.blocks().filter(isQuestion).length;
-      const lock = t.access === "email" ? "Sign-in" : t.access === "code" ? "Access code" : null;
-      return h("button", { class: "tcard", onclick: () => newPage(k) },
-        h("div", { class: "tcard-top", style: bandStyle({ color: t.color, brand: t.brand || {} }, true) }, h("span", { class: "e" }, t.emoji)),
-        h("div", { class: "tcard-body" }, h("b", null, t.name), h("small", null, t.d), h("div", { class: "tmeta" }, h("span", null, n ? n + " questions" : "🌐 Web page"), lock ? h("span", { class: "tlock" }, "🔒 " + lock) : null)));
-    }))]));
+  const gallery = h("section", { id: "templates", class: "tgal" },
+    h("div", { class: "sec-head" }, h("span", { class: "eyebrow" }, "Templates"), h("h2", null, "Start from a template"), h("p", { class: "muted" }, "Forms and pages with the right questions already in place. Change anything you like.")),
+    cats.map(c => {
+      const list = Object.entries(TEMPLATES).filter(([k, t]) => t.cat === c && !FEATURED.includes(k));
+      if (!list.length) return null;
+      return [h("h3", null, c), h("div", { class: "tgrid" }, list.map(([k, t]) => {
+        const n = t.blocks().filter(isQuestion).length;
+        const lock = t.access === "email" ? "Sign-in" : t.access === "code" ? "Access code" : null;
+        return h("button", { class: "tcard pro", onclick: () => newPage(k) },
+          h("div", { class: "tcard-body" },
+            h("span", { class: "tcard-ic" }, icon(CAT_ICON[c])),
+            h("b", null, t.name), h("small", null, t.d),
+            h("div", { class: "tmeta" }, h("span", null, n ? n + " questions" : "Web page"), lock ? h("span", { class: "tlock" }, lock) : null)));
+      }))];
+    }));
   const cards = pages.length ? pages.map(p => {
     const st = !p.published ? ["draft", "Draft"] : p.accepting ? ["live", "Live"] : ["closed", "Closed"];
     return h("div", { class: "card" },
@@ -697,10 +729,10 @@ async function viewHome() {
         h("button", { onclick: () => go("r-" + p.id), style: { display: "flex", alignItems: "baseline", gap: "6px" }, "aria-label": "See responses" }, h("b", null, p.response_count || 0), h("span", { class: "muted" }, (p.response_count === 1 ? "response" : "responses"))),
         h("div", { class: "spacer" }), h("span", { class: "pill " + st[0] }, st[1])),
       h("button", { class: "icon-btn card-menu", "aria-label": "Page options", onclick: () => cardMenu(p) }, icon("more")));
-  }) : [h("div", { class: "empty" }, h("h3", null, "Make your first page"), h("p", { class: "muted" }, "Start with a blank page above, or pick a ready-made template below."))];
+  }) : [h("div", { class: "empty" }, h("h3", null, "No pages yet"), h("p", { class: "muted" }, "Pick a showcase website above, a template below, or start with a blank page."))];
   mount(shell("var(--brand)", null,
-    [topBar(logo(), right), h("h1", null, greeting + "."), h("p", null, pages.length ? `${pages.length} page${pages.length === 1 ? "" : "s"} · ${total} response${total === 1 ? "" : "s"} collected` : "Make pages that tell and forms that collect."), h("div", { class: "new-row" }, tplBtns)],
-    h("main", { class: "wrap" }, h("div", { class: "grid" }, cards), gallery)));
+    [topBar(logo(), right), h("span", { class: "hero-eyebrow" }, store.ws && store.ws.name ? store.ws.name : "Blocko studio"), h("h1", { class: "hero-h" }, "Build pages that ", h("em", null, "sell your story"), "."), h("p", null, pages.length ? `Websites, showcases and forms in one place. ${pages.length} page${pages.length === 1 ? "" : "s"} · ${total} response${total === 1 ? "" : "s"} collected.` : "Websites, showcases and forms for creators and businesses. Free."), h("div", { class: "new-row" }, tplBtns)],
+    h("main", { class: "wrap" }, featured, h("div", { class: "sec-head" }, h("span", { class: "eyebrow" }, "Your work"), h("h2", null, "Your pages")), h("div", { class: "grid" }, cards), gallery)));
 }
 function cardMenu(p) {
   sheet((b, close) => b.append(h("h2", null, p.title || "Untitled page"), h("div", { class: "menu" },
