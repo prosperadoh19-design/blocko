@@ -388,8 +388,11 @@ async function shareSheet(page, onChange) {
     };
     loadQr().then(drawQr);
     const sync = async () => {
-      page.published = pub.checked; page.accepting = acc.checked;
-      await onChange(page);
+      try {
+        const r = await store.setPublished(page.id, pub.checked, acc.checked);
+        page.published = r.published; page.accepting = r.accepting;
+      } catch (e) { pub.checked = !!page.published; acc.checked = !!page.accepting; toast("Couldn't update: " + e.message); return; }
+      if (onChange) onChange(page);
       note.textContent = page.published ? (page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.";
     };
     pub.onchange = () => {
@@ -514,7 +517,7 @@ function cardMenu(p) {
   sheet((b, close) => b.append(h("h2", null, p.title || "Untitled page"), h("div", { class: "menu" },
     h("button", { onclick: () => { close(); go("p-" + p.id); } }, "✏️  Edit page"),
     h("button", { onclick: () => { close(); go("r-" + p.id); } }, "📊  See responses"),
-    h("button", { onclick: async () => { close(); const full = await store.getPage(p.id); shareSheet(full, pg => store.savePage(pg).then(() => route())); } }, "🔗  Share"),
+    h("button", { onclick: async () => { close(); const full = await store.getPage(p.id); shareSheet(full, () => route()); } }, "🔗  Share"),
     h("button", { onclick: async () => { close(); const full = await store.getPage(p.id); const copy = { ...full, id: uuid(), title: (full.title || "Untitled") + " (copy)", published: false, created_at: null, blocks: full.blocks.map(x => ({ ...x, id: uuid() })) }; await store.savePage(copy); toast("Page duplicated"); route(); } }, "📄  Duplicate"),
     h("button", { class: "danger", onclick: () => { close(); confirmSheet("Delete this page?", "The page and all its responses are removed for good.", "Delete", async () => { await store.deletePage(p.id); toast("Page deleted"); route(); }); } }, "🗑️  Delete"))));
 }
@@ -621,7 +624,7 @@ async function viewEditor(id) {
         lockPill,
         h("button", { class: "icon-btn", "aria-label": "Brand images", title: "Logo & background", onclick: () => { brandBox.scrollIntoView({ behavior: "smooth", block: "center" }); brandBox.classList.add("flash"); setTimeout(() => brandBox.classList.remove("flash"), 1400); } }, icon("image")),
         h("button", { class: "icon-btn", "aria-label": "Preview", title: "Preview", onclick: () => go("v-" + page.id) }, icon("eye")),
-        h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => { Object.assign(page, pg); return saveNow(); }) }, icon("share"), "Share"))),
+        h("button", { class: "btn small light", onclick: () => shareSheet(page, null) }, icon("share"), "Share"))),
     emojiBtn, title, desc,
     h("div", { class: "tabs" }, h("button", { class: "on" }, "Build"), h("button", { onclick: () => go("r-" + page.id) }, "Responses", countEl))));
 
@@ -743,7 +746,7 @@ async function viewEditor(id) {
     h("label", { class: "field" }, "Message after someone submits", thanks),
     accessBox,
     alertsField(page),
-    h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => { Object.assign(page, pg); return saveNow(); }) }, icon("share"), page.published ? "Share link" : "Publish & share"),
+    h("button", { class: "btn brand", onclick: () => shareSheet(page, null) }, icon("share"), page.published ? "Share link" : "Publish & share"),
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
 
   render();
@@ -1133,7 +1136,7 @@ async function viewResponses(id) {
   const week = rows.filter(r => Date.now() - new Date(r.created_at) < 7 * 864e5).length;
   const band = h("header", { class: "band on-color", style: bandStyle({ ...page, brand: { ...(page.brand || {}), coverMode: "header" } }) }, h("div", { class: "wrap" },
     topBar(h("div", { style: { display: "flex", alignItems: "center", gap: "4px" } }, h("button", { class: "icon-btn", "aria-label": "Back to home", onclick: () => go("home") }, icon("back")), logo()),
-      h("button", { class: "btn small light", onclick: () => shareSheet(page, pg => store.savePage(pg)) }, icon("share"), "Share")),
+      h("button", { class: "btn small light", onclick: () => shareSheet(page, null) }, icon("share"), "Share")),
     markEl(page),
     h("h1", null, page.title || "Untitled page"),
     h("div", { class: "tabs" }, h("button", { onclick: () => go("p-" + page.id) }, "Build"), h("button", { class: "on" }, "Responses", h("span", { class: "count" }, rows.length)))));
@@ -1150,7 +1153,7 @@ async function viewResponses(id) {
   const cell = (r, b) => { const v = r.answers ? r.answers[b.id] : undefined; const fs = v ? filesOf(v) : []; return fs.length ? h("div", { class: "chips" }, fs.map(fileChip)) : val(r, b); };
   function draw() {
     if (!rows.length) return content.replaceChildren(h("div", { class: "empty" }, h("h3", null, "No responses yet"), h("p", { class: "muted" }, page.published ? "Share your link to start collecting answers." : "Publish your page and share the link to start collecting answers."),
-      h("button", { class: "btn brand", onclick: () => shareSheet(page, pg => store.savePage(pg)) }, icon("share"), page.published ? "Share link" : "Publish & share")));
+      h("button", { class: "btn brand", onclick: () => shareSheet(page, null) }, icon("share"), page.published ? "Share link" : "Publish & share")));
     if (mode === "summary") {
       content.replaceChildren(h("div", { class: "sum" }, qs.map(b => {
         const vals = rows.map(r => r.answers ? r.answers[b.id] : undefined).filter(v => v != null && v !== "" && !(Array.isArray(v) && !v.length));

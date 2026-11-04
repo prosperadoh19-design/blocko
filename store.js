@@ -61,11 +61,16 @@ class DemoStore {
   async getPublicPage(id) { const p = this.data.pages[id]; return p && p.published ? structuredClone(p) : null; }
   async savePage(page) {
     const now = new Date().toISOString();
-    const p = { ...pick(page, SAVE_FIELDS), workspace_id: "demo", updated_at: now, created_at: page.created_at || now };
-    const before = this.data.pages[p.id];
+    const before = this.data.pages[page.id];
+    const p = { ...pick(page, SAVE_FIELDS), workspace_id: "demo", updated_at: now, created_at: (before && before.created_at) || page.created_at || now };
+    if (before) { p.published = before.published; p.accepting = before.accepting; }
     this.data.pages[p.id] = p;
     try { this.persist(); } catch (e) { if (before) this.data.pages[p.id] = before; else delete this.data.pages[p.id]; throw e; }
     return p;
+  }
+  async setPublished(id, published, accepting) {
+    const p = this.data.pages[id]; if (!p) throw new Error("Page not found");
+    p.published = published; p.accepting = accepting; p.updated_at = new Date().toISOString(); this.persist(); return p;
   }
   async deletePage(id) {
     delete this.data.pages[id]; delete this.data.alerts[id];
@@ -177,7 +182,15 @@ class CloudStore {
   async savePage(page) {
     const body = { ...pick(page, SAVE_FIELDS), workspace_id: page.workspace_id || this.ws.id, updated_at: new Date().toISOString() };
     delete body.created_at;
-    return this.check(await this.sb.from("pages").upsert(body).select().single());
+    if (page.created_at) {
+      // existing page: update its content only; published/accepting change only through setPublished
+      delete body.published; delete body.accepting; delete body.id;
+      return this.check(await this.sb.from("pages").update(body).eq("id", page.id).select().single());
+    }
+    return this.check(await this.sb.from("pages").insert(body).select().single());
+  }
+  async setPublished(id, published, accepting) {
+    return this.check(await this.sb.from("pages").update({ published, accepting, updated_at: new Date().toISOString() }).eq("id", id).select("id,published,accepting").single());
   }
   async deletePage(id) { this.check(await this.sb.from("pages").delete().eq("id", id)); }
   async getAlerts(id) { const r = this.check(await this.sb.from("page_alerts").select("emails").eq("page_id", id).maybeSingle()); return r ? r.emails : ""; }
