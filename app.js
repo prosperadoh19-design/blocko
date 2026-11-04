@@ -354,10 +354,9 @@ const TEMPLATES = {
       Q("long", "Anything else we should know?"),
       Q("consent", "I understand that work starts after the deposit is paid.", { required: true })] },
 
-  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "A dark artist site: stream your songs, tour dates, videos, photos, credits and bookings.",
+  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Show yourself off: a web page with your music, tour dates, videos, photos, credits and booking contacts. Nothing to fill in.",
     brand: { layout: "artist", cover: "backgrounds/stage.jpg", coverMode: "header", tint: 0.5 },
     title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria. Write one line about your sound here.",
-    thank_you: "Thank you! Your message has been sent to management. We'll reply soon.",
     blocks: () => [
       { ...SHOW.profile.make(), badge: 'New single out now', headline: "Write a strong headline about your music.",
         bio: "Write your story here: where you're from, your sound and what makes your music different.\n\nAdd a second paragraph about your biggest shows, collaborations or your newest project.",
@@ -369,10 +368,7 @@ const TEMPLATES = {
       { ...SHOW.tour.make(), items: [{ city: "", venue: "", date: "", time: "", status: "", url: "" }] },
       SHOW.video.make(),
       SHOW.gallery.make(),
-      SHOW.work.make(),
-      Q("short", "Your name", { required: true }), Q("email", "Email address", { required: true }), Q("phone", "Phone / WhatsApp"),
-      Q("dropdown", "Inquiry type", { required: true, ...opts("Show / event booking", "Feature or collaboration", "Press & media interview", "Brand partnership", "General inquiry") }),
-      Q("long", "Message", { required: true, help: "Tell us about your event or request: date, place and budget." })] },
+      SHOW.work.make()] },
 
   onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
     access: "code", accessCode: true,
@@ -507,10 +503,12 @@ async function shareSheet(page, onChange) {
         page.published = r.published; page.accepting = r.accepting;
       } catch (e) { pub.checked = !!page.published; acc.checked = !!page.accepting; toast("Couldn't update: " + e.message); return; }
       if (onChange) onChange(page);
-      note.textContent = page.published ? (page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.";
+      note.textContent = page.published ? (isStatic ? "Live. Anyone with the link can see your page." : page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.";
     };
+    const isStatic = !(page.blocks || []).some(isQuestion);
     pub.onchange = () => {
       if (!pub.checked) return sync();
+      if (isStatic) { sync(); toast("Published"); return; }
       pub.checked = false;
       sheet((b2, close2) => {
         const cb = h("input", { type: "checkbox", id: "lawful" });
@@ -523,18 +521,18 @@ async function shareSheet(page, onChange) {
       });
     };
     acc.onchange = sync;
-    const note = h("div", { class: "muted", style: { fontSize: "14px" } }, page.published ? (page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.");
+    const note = h("div", { class: "muted", style: { fontSize: "14px" } }, page.published ? (isStatic ? "Live. Anyone with the link can see your page." : page.accepting ? "Live. Anyone with the link can fill it in." : "Live, but closed to new answers.") : "Draft. Only you can see it.");
     b.append(
       h("h2", null, "Share"),
       h("div", { style: { display: "grid", gap: "12px" } },
         h("label", { class: "switch" }, pub, "Publish this page"),
-        h("label", { class: "switch" }, acc, "Accept new responses"), note),
+        isStatic ? null : h("label", { class: "switch" }, acc, "Accept new responses"), note),
       h("div", { class: "share-link" }, link, h("button", { class: "btn dark small", onclick: async () => {
         try { await navigator.clipboard.writeText(link.value); toast("Link copied"); } catch (e) { link.select(); toast("Press Ctrl+C to copy"); }
       } }, icon("copy"), "Copy")),
       store.mode === "demo" ? h("div", { class: "muted", style: { fontSize: "14px" } }, "In demo mode this link only works on this device. Once the app is online, it works for anyone.") : null,
       qrBox,
-      h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { close(); go("f-" + page.id); } }, icon("eye"), "Open form"), h("button", { class: "btn brand", onclick: close }, "Done"))
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { close(); go("f-" + page.id); } }, icon("eye"), isStatic ? "Open page" : "Open form"), h("button", { class: "btn brand", onclick: close }, "Done"))
     );
   });
 }
@@ -612,7 +610,7 @@ async function viewHome() {
       const lock = t.access === "email" ? "Sign-in" : t.access === "code" ? "Access code" : null;
       return h("button", { class: "tcard", onclick: () => newPage(k) },
         h("div", { class: "tcard-top", style: bandStyle({ color: t.color, brand: t.brand || {} }, true) }, h("span", { class: "e" }, t.emoji)),
-        h("div", { class: "tcard-body" }, h("b", null, t.name), h("small", null, t.d), h("div", { class: "tmeta" }, h("span", null, n + " questions"), lock ? h("span", { class: "tlock" }, "🔒 " + lock) : null)));
+        h("div", { class: "tcard-body" }, h("b", null, t.name), h("small", null, t.d), h("div", { class: "tmeta" }, h("span", null, n ? n + " questions" : "🌐 Web page"), lock ? h("span", { class: "tlock" }, "🔒 " + lock) : null)));
     }))]));
   const cards = pages.length ? pages.map(p => {
     const st = !p.published ? ["draft", "Draft"] : p.accepting ? ["live", "Live"] : ["closed", "Closed"];
@@ -620,6 +618,7 @@ async function viewHome() {
       h("button", { class: "card-top", style: { ...bandStyle(p, true), textAlign: "left" }, onclick: () => go("p-" + p.id) },
         p.brand && p.brand.logo ? h("span", { class: "card-logo" }, h("img", { src: p.brand.logo, alt: "" })) : h("span", { class: "e" }, p.emoji || "📝"), h("h3", null, p.title || "Untitled page")),
       h("div", { class: "card-bot" },
+        !(p.blocks || []).some(isQuestion) && (p.blocks || []).length ? h("span", { class: "muted", style: { fontWeight: 600 } }, "🌐 Web page") :
         h("button", { onclick: () => go("r-" + p.id), style: { display: "flex", alignItems: "baseline", gap: "6px" }, "aria-label": "See responses" }, h("b", null, p.response_count || 0), h("span", { class: "muted" }, (p.response_count === 1 ? "response" : "responses"))),
         h("div", { class: "spacer" }), h("span", { class: "pill " + st[0] }, st[1])),
       h("button", { class: "icon-btn card-menu", "aria-label": "Page options", onclick: () => cardMenu(p) }, icon("more")));
@@ -722,6 +721,7 @@ async function viewEditor(id) {
     saveT = setTimeout(saveNow, now ? 0 : 700);
   };
   page.brand = page.brand || {};
+  let respTab = null, aboutTab = null;
   const band = h("header", { class: "band on-color" });
   applyBand(band, page);
   const countEl = h("span", { class: "count" }, "…");
@@ -741,13 +741,14 @@ async function viewEditor(id) {
         h("button", { class: "icon-btn", "aria-label": "Preview", title: "Preview", onclick: () => go("v-" + page.id) }, icon("eye")),
         h("button", { class: "btn small light", onclick: () => shareSheet(page, null) }, icon("share"), "Share"))),
     emojiBtn, title, desc,
-    h("div", { class: "tabs" }, h("button", { class: "on" }, "Build"), h("button", { onclick: () => go("r-" + page.id) }, "Responses", countEl),
-      h("button", { class: "tab-about", onclick: () => { aboutBox.scrollIntoView({ behavior: "smooth", block: "start" }); aboutBox.classList.add("flash"); setTimeout(() => aboutBox.classList.remove("flash"), 1600); } }, "🏢 About"))));
+    h("div", { class: "tabs" }, h("button", { class: "on" }, "Build"), (respTab = h("button", { onclick: () => go("r-" + page.id) }, "Responses", countEl)),
+      (aboutTab = h("button", { class: "tab-about", onclick: () => { aboutBox.scrollIntoView({ behavior: "smooth", block: "start" }); aboutBox.classList.add("flash"); setTimeout(() => aboutBox.classList.remove("flash"), 1600); } }, "🏢 About")))));
 
   const list = h("div", { class: "blocks" });
   const render = () => {
     list.replaceChildren(addLine(0));
     page.blocks.forEach((b, i) => { list.append(blockCard(b, i), addLine(i + 1)); });
+    if (typeof syncStatic === "function") try { syncStatic(); } catch (e) {}
     if (!page.blocks.length) list.append(h("div", { class: "empty" }, h("h3", null, "Empty page"), h("p", { class: "muted" }, "Add text, headings and questions with the button above.")));
   };
   const addLine = at => h("div", { class: "add-line" }, h("button", { class: "add-btn", onclick: () => palette(at) }, icon("plus"), at === page.blocks.length && at > 0 ? "Add block" : "Add"));
@@ -851,6 +852,9 @@ async function viewEditor(id) {
   const thanks = h("textarea", { class: "textarea", style: { minHeight: "80px" }, value: page.thank_you || "", placeholder: "Thanks! We got your answers.", oninput: e => { page.thank_you = e.target.value; save(); } });
   const brandBox = brandSettings(page, refreshLook, save);
   const aboutBox = aboutField(page, save);
+  let thanksBox = null, alertsBox = null;
+  const syncStatic = () => { const st = !page.blocks.some(isQuestion); [respTab, lockPill, accessBox, alertsBox, thanksBox].forEach(e => { if (e) e.hidden = st; });
+    const artist = page.brand.layout === "artist"; [aboutTab, aboutBox].forEach(e => { if (e) e.hidden = artist; }); };
   const accessBox = accessField(page, save, () => drawLock());
   function drawLock() {
     const a = page.access || "open";
@@ -865,13 +869,13 @@ async function viewEditor(id) {
     layoutField(page, save),
     brandBox,
     aboutBox,
-    h("label", { class: "field" }, "Message after someone submits", thanks),
+    (thanksBox = h("label", { class: "field" }, "Message after someone submits", thanks)),
     accessBox,
-    alertsField(page),
+    (alertsBox = alertsField(page)),
     h("button", { class: "btn brand", onclick: () => shareSheet(page, null) }, icon("share"), page.published ? "Share link" : "Publish & share"),
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
 
-  render();
+  render(); syncStatic(); window.__syncStatic = syncStatic;
   mount(store.mode === "demo" ? h("div", { class: "demo-bar" }, h("b", null, "Demo mode"), " · Pages and answers stay on this device until the app goes live.") : null,
     band, h("main", { class: "wrap" }, h("div", { class: "edit-layout" }, list, side)));
   autogrow(title); autogrow(desc); refreshLook();
@@ -1049,9 +1053,9 @@ function layoutField(page, save) {
   const box = h("div", { class: "field" });
   const draw = () => {
     const cur = page.brand.layout === "artist" ? "artist" : "standard";
-    box.replaceChildren("Page style", h("div", { class: "seg small" }, [["standard", "Standard"], ["artist", "🎤 Artist website (dark)"]].map(([k, l]) =>
-      h("button", { class: cur === k ? "on" : "", type: "button", onclick: () => { if (k === "artist") page.brand.layout = "artist"; else delete page.brand.layout; save(); draw(); toast(k === "artist" ? "Artist website style on. Tap Preview to see it." : "Standard style on."); } }, l))),
-      h("small", { class: "muted", style: { fontWeight: 400 } }, cur === "artist" ? "A dark music website: big header, discography, tour, videos, booking form and a player bar. Your background image fills the header." : "The normal Blocko page."));
+    box.replaceChildren("Page style", h("div", { class: "seg small" }, [["standard", "Standard"], ["artist", "🎤 Artist website"]].map(([k, l]) =>
+      h("button", { class: cur === k ? "on" : "", type: "button", onclick: () => { if (k === "artist") page.brand.layout = "artist"; else delete page.brand.layout; save(); draw(); toast(k === "artist" ? "Artist website style on. Tap Preview to see it." : "Standard style on."); if (window.__syncStatic) window.__syncStatic(); } }, l))),
+      h("small", { class: "muted", style: { fontWeight: 400 } }, cur === "artist" ? "A dark website to show yourself off: big header, profile, music, tour, videos, photos, credits, contacts and a player bar. Your background image fills the header." : "The normal Blocko page."));
   };
   draw(); return box;
 }
@@ -1123,7 +1127,7 @@ async function viewForm(id, preview) {
   try { page = preview ? await store.getPage(id) : await store.getPublicPage(id); } catch (e) { page = null; }
   document.documentElement.style.setProperty("--page", (page && page.color) || COLORS[0]);
   if (!page) {
-    return mount(h("header", { class: "band", style: { background: "var(--c-ink)" } }, h("div", { class: "wrap" }, h("h1", null, "This form isn't available"), h("p", null, "It may be unpublished or the link may be wrong. Ask the person who sent it for a new link."))));
+    return mount(h("header", { class: "band", style: { background: "var(--c-ink)" } }, h("div", { class: "wrap" }, h("h1", null, "This page isn't available"), h("p", null, "It may be unpublished or the link may be wrong. Ask the person who sent it for a new link."))));
   }
   document.title = (page.title || "Form") + " · Blocko";
   const answers = {};
@@ -1271,7 +1275,7 @@ async function viewForm(id, preview) {
   } }, body, !page.blocks.some(isQuestion) ? null : h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
   const access = page.access || "open";
   if (access === "open" || closed) {
-    const pv = preview && access === "open" ? h("div", { class: "pv-bar" },
+    const pv = preview && access === "open" && page.blocks.some(isQuestion) ? h("div", { class: "pv-bar" },
       h("span", null, "🔓 No sign-in: anyone with the link goes straight to the questions."),
       h("button", { class: "btn small light", onclick: async ev => {
         ev.currentTarget.disabled = true;
@@ -1745,7 +1749,8 @@ Object.assign(SHOW, {
         lbl("Genres (separate with commas)", fld(b, "genres", "Afrobeats, R&B, Amapiano", save, { max: 80 })),
         h("div", { class: "field" }, "Big numbers (up to 3)", listEditor(b, "stats", 3, "Add a number", it => h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 2fr" } }, fld(it, "value", "4.8M+", save, { max: 12 }), fld(it, "label", "Monthly listeners", save, { max: 30 })), () => ({ value: "", label: "" }), save)),
         h("div", { class: "field" }, "Achievements (up to 6)", listEditor(b, "highlights", 6, "Add an achievement", it => h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "e.g. Best New Artist", save, { max: 40 }), fld(it, "sub", "e.g. Headies Awards 2025", save, { max: 60 })), () => ({ title: "", sub: "" }), save)),
-        h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, lbl("Booking email", fld(b, "bookingEmail", "booking@you.com", save, { type: "email", max: 120 })), lbl("Press email", fld(b, "pressEmail", "press@you.com", save, { type: "email", max: 120 }))));
+        h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, lbl("Booking email", fld(b, "bookingEmail", "booking@you.com", save, { type: "email", max: 120 })), lbl("Press email", fld(b, "pressEmail", "press@you.com", save, { type: "email", max: 120 }))),
+        lbl("Booking phone / WhatsApp", phoneField(h, { value: b.bookingPhone || "", onChange: v => { b.bookingPhone = v; save(); } })));
     },
     view(b) {
       if (!b.headline && !b.bio && !b.photo) return null;

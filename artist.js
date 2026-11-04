@@ -94,7 +94,7 @@ export function artistSite(d, page, preview, topBarEl, main) {
       page.description ? h("p", { class: "ar-tag" }, page.description) : null,
       h("div", { class: "ar-cta" },
         queue.length ? h("button", { class: "ar-btn white ar-listen", type: "button", onclick: () => cur < 0 ? play(0) : toggle() }, fa("fa-solid fa-play"), h("span", null, "Listen now")) : null,
-        tours.some(t => upcoming(t.items).length) ? h("a", { class: "ar-btn glass", href: "#tour" }, fa("fa-solid fa-ticket", "c-cyan"), h("span", null, "Tour dates")) : hasForm ? h("a", { class: "ar-btn glass", href: "#contact" }, fa("fa-solid fa-envelope", "c-cyan"), h("span", null, "Book me")) : null),
+        tours.some(t => upcoming(t.items).length) ? h("a", { class: "ar-btn glass", href: "#tour" }, fa("fa-solid fa-ticket", "c-cyan"), h("span", null, "Tour dates")) : (hasForm || prof.bookingEmail || prof.bookingPhone) ? h("a", { class: "ar-btn glass", href: "#contact" }, fa("fa-solid fa-envelope", "c-cyan"), h("span", null, "Book me")) : null),
       stream.length ? h("div", { class: "ar-stream" }, h("span", null, "Stream everywhere:"), stream.map(l => h("a", { href: l.href, target: "_blank", rel: "noopener" }, fa(FA[l.plat] || FA.Website), h("span", null, l.label || l.plat)))) : null),
     h("a", { class: "ar-down", href: "#about", "aria-label": "Scroll down" }, fa("fa-solid fa-chevron-down")));
 
@@ -195,23 +195,31 @@ export function artistSite(d, page, preview, topBarEl, main) {
   parts.push(h("section", { class: "ar-sec ar-ads", "aria-label": "Sponsored" }, h("div", { class: "ar-wrap" }, h("span", { class: "ar-kick" }, "Sponsored"), h("div", { class: "ar-ads-row" }, adSlot(), adSlot()))));
 
   // contact
-  if (hasForm || prof.bookingEmail || prof.pressEmail) {
+  const phone = (prof.bookingPhone || "").replace(/[^\d+]/g, "");
+  if (hasForm || prof.bookingEmail || prof.pressEmail || phone) {
     nav.push(["contact", "Contact"]);
-    const card = (icon, k, v, c) => h("a", { class: "ar-contact", href: "mailto:" + v }, h("span", { class: "ic " + c }, fa(icon)), h("span", null, h("small", null, k), h("b", null, v)));
-    main.classList.add("ar-form");
-    parts.push(h("section", { id: "contact", class: "ar-sec alt" }, h("div", { class: "ar-wrap ar-contact-grid" },
+    const card = (icon, k, v, href, c, ext) => h("a", { class: "ar-contact", href, target: ext ? "_blank" : null, rel: ext ? "noopener" : null }, h("span", { class: "ic " + c }, fa(icon)), h("span", null, h("small", null, k), h("b", null, v)));
+    const cards = [
+      prof.bookingEmail ? card("fa-solid fa-envelope", "Booking management", prof.bookingEmail, "mailto:" + prof.bookingEmail + "?subject=" + encodeURIComponent("Booking enquiry for " + name), "purple") : null,
+      prof.pressEmail ? card("fa-solid fa-newspaper", "Press & PR", prof.pressEmail, "mailto:" + prof.pressEmail + "?subject=" + encodeURIComponent("Press enquiry: " + name), "cyan") : null,
+      phone ? card("fa-brands fa-whatsapp", "WhatsApp", prof.bookingPhone, "https://wa.me/" + phone.replace(/^\+/, "") + "?text=" + encodeURIComponent("Hello " + name + ", I'd like to make a booking enquiry."), "emerald", true) : null,
+      phone ? card("fa-solid fa-phone", "Call", prof.bookingPhone, "tel:" + phone, "purple") : null].filter(Boolean);
+    if (hasForm) main.classList.add("ar-form");
+    parts.push(h("section", { id: "contact", class: "ar-sec alt" }, h("div", { class: "ar-wrap ar-contact-grid" + (hasForm ? "" : " solo") },
       h("div", { class: "ar-contact-l" }, h("span", { class: "ar-kick cyan" }, "Get in touch"), h("h2", null, "Management & booking"),
-        h("p", { class: "ar-muted" }, "For show bookings, press, brand collaborations or features, send a message or email the team directly."),
-        prof.bookingEmail ? card("fa-solid fa-envelope", "Booking management", prof.bookingEmail, "purple") : null,
-        prof.pressEmail ? card("fa-solid fa-newspaper", "Press & PR", prof.pressEmail, "cyan") : null),
-      hasForm ? h("div", { class: "ar-contact-r" }, h("div", { class: "ar-form-card" }, h("h3", null, "Send a direct message"), main)) : null)));
+        h("p", { class: "ar-muted" }, "For show bookings, press, brand collaborations or features, reach out to the team directly."),
+        hasForm ? cards : null,
+        !hasForm && (prof.bookingEmail || phone) ? h("div", { class: "ar-cta left" },
+          prof.bookingEmail ? h("a", { class: "ar-btn grad", href: "mailto:" + prof.bookingEmail + "?subject=" + encodeURIComponent("Booking enquiry for " + name) }, fa("fa-solid fa-envelope"), h("span", null, "Book now")) : null,
+          phone ? h("a", { class: "ar-btn glass", href: "https://wa.me/" + phone.replace(/^\+/, ""), target: "_blank", rel: "noopener" }, fa("fa-brands fa-whatsapp", "c-emerald"), h("span", null, "WhatsApp")) : null) : null),
+      hasForm ? h("div", { class: "ar-contact-r" }, h("div", { class: "ar-form-card" }, h("h3", null, "Send a direct message"), main)) : h("div", { class: "ab-contacts" }, cards))));
   }
 
   // nav + footer
   const socials = links.slice(0, 6);
   const menu = h("div", { class: "ar-mmenu", hidden: true }, nav.map(([id, l]) => h("a", { href: "#" + id, onclick: () => { menu.hidden = true; } }, l)),
     h("div", { class: "ar-mmenu-foot" }, h("div", { class: "ar-soc" }, socials.map(l => h("a", { href: l.href, target: "_blank", rel: "noopener", "aria-label": l.label || l.plat }, fa(FA[l.plat] || FA.Website))))));
-  const ctaT = dates.some(t => t.href) ? ["#tour", "Get tickets"] : hasForm ? ["#contact", "Book now"] : null;
+  const ctaT = dates.some(t => t.href) ? ["#tour", "Get tickets"] : (hasForm || prof.bookingEmail || prof.bookingPhone) ? ["#contact", "Book now"] : null;
   const navEl = h("nav", { class: "ar-nav" }, h("div", { class: "ar-wrap ar-nav-in" },
     h("a", { class: "ar-logo", href: "#hero" }, h("span", null, name), h("i")),
     h("div", { class: "ar-links" }, nav.map(([id, l]) => h("a", { href: "#" + id }, l))),

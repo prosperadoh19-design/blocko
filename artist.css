@@ -258,3 +258,5 @@ body.artist-mode{background:#0B0D13;color:#e2e8f0}
 .ab-links .ar-contact{position:relative}.ab-links .ab-out{margin-left:auto;color:#64748b;font-size:12px}
 .ab-contacts{display:grid;gap:14px;align-content:start}
 .ar-root .ar-burger{font-size:20px}
+.ar-cta.left{justify-content:flex-start;margin-top:6px}
+@media (max-width:560px){.ar-cta.left{flex-direction:column}}
