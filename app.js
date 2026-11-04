@@ -876,6 +876,13 @@ async function viewEditor(id) {
     h("button", { class: "btn", onclick: () => go("v-" + page.id) }, icon("eye"), "Preview"));
 
   render(); syncStatic(); window.__syncStatic = syncStatic;
+  window.__addBlockAfter = (id, type) => {
+    const i = page.blocks.findIndex(x => x.id === id);
+    const nb = { ...SHOW[type].make(), title: type === "album" ? "New release" : undefined, year: type === "album" ? String(new Date().getFullYear()) : undefined };
+    page.blocks.splice(i + 1, 0, nb); sel = nb.id; render(); save();
+    setTimeout(() => { const el = list.querySelector(".block.sel"); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 50);
+    toast("New release added. Give it a name and add songs.");
+  };
   mount(store.mode === "demo" ? h("div", { class: "demo-bar" }, h("b", null, "Demo mode"), " · Pages and answers stay on this device until the app goes live.") : null,
     band, h("main", { class: "wrap" }, h("div", { class: "edit-layout" }, list, side)));
   autogrow(title); autogrow(desc); refreshLook();
@@ -1502,6 +1509,13 @@ const scLabel = (b, def) => h("div", { class: "sc-label" }, b.heading || def);
 const scHeadingInput = (b, def, save) => h("label", { class: "field" }, "Section title", h("input", { class: "input", value: b.heading || "", placeholder: def, maxLength: 40, oninput: e => { b.heading = e.target.value; save(); } }));
 const audioDuration = file => new Promise(res => { const a = new Audio(); const u = URL.createObjectURL(file); a.preload = "metadata"; a.onloadedmetadata = () => { res(a.duration); URL.revokeObjectURL(u); }; a.onerror = () => res(0); a.src = u; setTimeout(() => res(0), 6000); });
 let nowPlaying = null; // only one song plays at a time across the page
+// a row of tick boxes where one is chosen (looks like check boxes, works like a choice)
+function tickGroup(options, value, onPick, label) {
+  const box = h("div", { class: "ticks", role: "radiogroup", "aria-label": label || "" });
+  const draw = v => box.replaceChildren(...options.map(([k, l]) => h("label", { class: "tick-opt" + (v === k ? " on" : "") },
+    h("input", { type: "checkbox", checked: v === k, onchange: () => { onPick(k); draw(k); } }), h("span", null, l))));
+  draw(value); return box;
+}
 
 const SHOW = {
   album: {
@@ -1551,11 +1565,12 @@ const SHOW = {
       };
       drawTracks();
       g.append(scHeadingInput(b, "Music", save),
-        h("div", { class: "sc-row2" },
+        h("div", { class: "sc-row2", style: { gridTemplateColumns: "3fr 1fr" } },
           h("label", { class: "field" }, "Album / EP / single name", h("input", { class: "input", value: b.title || "", placeholder: "e.g. Lagos Nights", maxLength: 80, oninput: e => { b.title = e.target.value; save(); } })),
-          h("label", { class: "field" }, "Type", h("select", { class: "select", onchange: e => { b.kind = e.target.value; save(); } }, ["Album", "EP", "Single", "Mixtape"].map(k => h("option", { selected: (b.kind || "Album") === k }, k)))),
           h("label", { class: "field" }, "Year", h("input", { class: "input", value: b.year || "", placeholder: "2026", maxLength: 4, inputMode: "numeric", oninput: e => { b.year = e.target.value; save(); } }))),
-        cover, h("div", { class: "field" }, "Songs", h("small", { class: "muted", style: { fontWeight: 400 } }, "Listeners can play the songs on the page, with no download button."), tracks));
+        h("div", { class: "field" }, "Type", tickGroup(["Album", "EP", "Single", "Mixtape"].map(k => [k, k]), b.kind || "Album", k => { b.kind = k; save(); }, "Release type")),
+        cover, h("div", { class: "field" }, "Songs", h("small", { class: "muted", style: { fontWeight: 400 } }, "Add as many songs as you like: pick several at once, or tap + Add songs again. Listeners can play them, with no download button."), tracks),
+        h("div", { class: "field" }, "More music", h("button", { class: "add-btn", type: "button", style: { justifySelf: "start" }, onclick: () => window.__addBlockAfter && window.__addBlockAfter(b.id, "album") }, icon("plus"), "Add another album, EP or single")));
     },
     view(b) {
       const list = (b.tracks || []).filter(t => t.path);
@@ -1741,11 +1756,12 @@ Object.assign(SHOW, {
           h("div", { class: "brand-acts" }, h("b", null, "Artist photo"), h("small", { class: "muted" }, "A tall portrait photo looks best."), h("div", { style: { display: "flex", gap: "6px" } }, btn, b.photo ? h("button", { class: "btn small", type: "button", onclick: () => { b.photo = ""; save(); drawPhoto(); } }, "Remove") : "")));
       };
       drawPhoto();
-      g.append(photo,
+      g.append(h("div", { class: "field" }, "This page is for", tickGroup([["artist", "🎤 An artist"], ["label", "💿 A record label"]], b.kind || "artist", k => { b.kind = k; save(); g.replaceChildren(); SHOW.profile.edit(b, g, save); }, "Page is for")),
+        photo,
         lbl("Top banner text (optional)", fld(b, "badge", 'e.g. New album "Lagos Nights" out now', save, { max: 70 })),
         lbl("Headline", fld(b, "headline", "e.g. Afrobeats from Lagos to the world.", save, { max: 90 })),
         lbl("Bio", fld(b, "bio", "Who you are, your sound, your story. Use an empty line to start a new paragraph.", save, { area: true, max: 2000, h: "140px" })),
-        h("div", { class: "sc-row2" }, lbl("Based in", fld(b, "location", "Lagos, NG", save)), lbl("Label", fld(b, "label", "Independent", save)), lbl("Active since", fld(b, "since", "2019", save, { max: 10 }))),
+        h("div", { class: "sc-row2" }, lbl("Based in", fld(b, "location", "Lagos, NG", save)), lbl(b.kind === "label" ? "Founded by / CEO" : "Label", fld(b, "label", b.kind === "label" ? "e.g. Ade Bello" : "Independent", save)), lbl("Active since", fld(b, "since", "2019", save, { max: 10 }))),
         lbl("Genres (separate with commas)", fld(b, "genres", "Afrobeats, R&B, Amapiano", save, { max: 80 })),
         h("div", { class: "field" }, "Big numbers (up to 3)", listEditor(b, "stats", 3, "Add a number", it => h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 2fr" } }, fld(it, "value", "4.8M+", save, { max: 12 }), fld(it, "label", "Monthly listeners", save, { max: 30 })), () => ({ value: "", label: "" }), save)),
         h("div", { class: "field" }, "Achievements (up to 6)", listEditor(b, "highlights", 6, "Add an achievement", it => h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "e.g. Best New Artist", save, { max: 40 }), fld(it, "sub", "e.g. Headies Awards 2025", save, { max: 60 })), () => ({ title: "", sub: "" }), save)),
@@ -1770,7 +1786,8 @@ Object.assign(SHOW, {
       g.append(scHeadingInput(b, "Tour dates", save), h("small", { class: "muted" }, "Past dates hide by themselves."),
         listEditor(b, "items", 30, "Add a date", it => h("div", { class: "edit-grid", style: { gap: "6px" } },
           h("div", { class: "sc-row2" }, fld(it, "city", "City, e.g. Lagos, NG", save), fld(it, "date", "", save, { type: "date", label: "Date" }), fld(it, "time", "", save, { type: "time", label: "Time" })),
-          h("div", { class: "sc-row2" }, fld(it, "venue", "Venue, e.g. Eko Convention Centre", save), h("select", { class: "select", "aria-label": "Ticket status", onchange: e => { it.status = e.target.value; save(); } }, TOUR_STATUS.map(st => h("option", { value: st, selected: (it.status || "") === st }, st || "No label"))), h("span")),
+          h("div", { class: "sc-row2" }, fld(it, "venue", "Venue, e.g. Eko Convention Centre", save), h("span"), h("span")),
+          h("div", { class: "field" }, "Ticket label", tickGroup(TOUR_STATUS.map(st => [st, st || "None"]), it.status || "", k => { it.status = k; save(); }, "Ticket label")),
           fld(it, "url", "Ticket link (https://…)", save, { type: "url", max: 300 })), () => ({ city: "", venue: "", date: "", time: "", status: "", url: "" }), save));
     },
     view(b) {
