@@ -377,7 +377,8 @@ const TEMPLATES = {
       Q("long", "Anything else we should know?"),
       Q("consent", "I understand that work starts after the deposit is paid.", { required: true })] },
 
-  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Show yourself off: a web page with your music, tour dates, videos, photos, credits and booking contacts. Comes with sample pictures you can replace.",
+  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Show yourself off: music player, tour dates, videos, photos, credits, booking contacts and a booking message form. Comes with sample content you can replace.",
+    thank_you: "Thank you! Your message has been sent to management. We'll reply soon.",
     brand: { layout: "artist", cover: UNSPLASH(MUSIC_PHOTOS.stage), coverMode: "header", tint: 0.5 },
     title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria. Write one line about your sound here.",
     blocks: () => [
@@ -385,15 +386,26 @@ const TEMPLATES = {
         bio: "Write your story here: where you're from, your sound and what makes your music different.\n\nAdd a second paragraph about your biggest shows, collaborations or your newest project.",
         location: "Lagos, NG", label: "Independent", since: String(new Date().getFullYear() - 3), genres: "Afrobeats, R&B",
         stats: [{ value: "250K+", label: "Monthly listeners" }, { value: "3M+", label: "Total streams" }, { value: "40", label: "Shows played" }],
-        highlights: [{ title: "Best New Artist", sub: "Sample award 2025" }, { title: "Top 10", sub: "Sample chart" }, { title: "Sold-out show", sub: "Sample venue" }] },
+        highlights: [{ title: "Best New Artist", sub: "Sample award 2025" }, { title: "Top 10", sub: "Sample chart" }, { title: "Sold-out show", sub: "Sample venue" }],
+        bookingEmail: "booking@yourname.com", pressEmail: "press@yourname.com", bookingPhone: "+234 8000000000" },
       { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()), cover: UNSPLASH(MUSIC_PHOTOS.vinyl, 800, 800) },
       { ...SHOW.album.make(), title: "Your single", kind: "Single", year: String(new Date().getFullYear() - 1), cover: UNSPLASH(MUSIC_PHOTOS.guitar, 800, 800) },
       { ...SHOW.album.make(), title: "Your EP", kind: "EP", year: String(new Date().getFullYear() - 2), cover: UNSPLASH(MUSIC_PHOTOS.sax, 800, 800) },
-      { ...SHOW.links.make(), items: ["Spotify", "Apple Music", "Audiomack", "Boomplay", "YouTube", "Instagram", "TikTok"].map(label => ({ label, url: "" })) },
-      { ...SHOW.tour.make(), items: [{ city: "", venue: "", date: "", time: "", status: "", url: "" }] },
-      SHOW.video.make(),
+      { ...SHOW.links.make(), items: [["Spotify", "https://open.spotify.com"], ["Apple Music", "https://music.apple.com"], ["Audiomack", "https://audiomack.com"], ["Boomplay", "https://www.boomplay.com"],
+        ["YouTube", "https://www.youtube.com"], ["Instagram", "https://www.instagram.com"], ["TikTok", "https://www.tiktok.com"]].map(([label, url]) => ({ label, url })) },
+      { ...SHOW.tour.make(), items: [["Lagos, NG", "Sample venue, Victoria Island", 21, "20:00", "Selling fast"], ["Abuja, NG", "Sample arena", 35, "21:00", "Low stock"], ["Accra, GH", "Sample concert hall", 49, "20:30", "General sale"], ["London, UK", "Sample club", 63, "19:30", "Sold out"]]
+        .map(([city, venue, days, time, status]) => ({ city, venue, date: new Date(Date.now() + days * 864e5).toISOString().slice(0, 10), time, status, url: status === "Sold out" ? "" : "https://tix.africa" })) },
+      { ...SHOW.video.make(), channel: "https://www.youtube.com", items: [
+        { url: "https://www.youtube.com/watch?v=K4DyBUG242c", title: "Sample music video", kind: "Official music video", desc: "Replace with your own YouTube link" },
+        { url: "https://www.youtube.com/watch?v=J2X5mJ3HDYE", title: "Sample live performance", kind: "Live session", desc: "Replace with your own YouTube link" }] },
       { ...SHOW.gallery.make(), images: ["concert", "band", "drummer", "micBokeh", "crowd"].map(k => UNSPLASH(MUSIC_PHOTOS[k], 1600)) },
-      SHOW.work.make()] },
+      { ...SHOW.work.make(), items: [
+        { title: "Featured artist", org: "Sample song by another artist", date: "2025", url: "", desc: "Wrote and sang a verse. Replace with your own credits." },
+        { title: "Live performance", org: "Sample music festival", date: "2025", url: "", desc: "Performed on the main stage." },
+        { title: "Songwriter", org: "Sample album project", date: "2024", url: "", desc: "Co-wrote three songs." }] },
+      Q("short", "Your name", { required: true }), Q("email", "Email address", { required: true }), Q("phone", "Phone / WhatsApp"),
+      Q("checkbox", "Inquiry type", { required: true, ...opts("Show / event booking", "Feature or collaboration", "Press & media interview", "Brand partnership", "General inquiry") }),
+      Q("long", "Message", { required: true, help: "Tell us about your event or request: date, place and budget." })] },
 
   fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample photos you can replace.",
     brand: { layout: "fashion", cover: UNSPLASH(FASHION_PHOTOS.hangers), coverMode: "header", tint: 0.5 },
