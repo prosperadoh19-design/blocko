@@ -1256,10 +1256,12 @@ function galleryEl(cats) {
   const chips = cats.length > 1 ? h("div", { class: "gal-chips", role: "tablist" }) : null;
   const draw = () => {
     if (chips) chips.replaceChildren(...[["all", "All", cats.reduce((n, c) => n + c.images.length, 0)], ...cats.map((c, i) => [i, c.name, c.images.length])].map(([k, l, n]) =>
-      h("button", { class: cur === k ? "on" : "", role: "tab", onclick: () => { cur = k; draw(); } }, l, h("span", null, n))));
+      h("button", { class: cur === k ? "on" : "", role: "tab", "aria-selected": cur === k, onclick: () => { cur = k; draw(); } }, l, h("sup", null, n))));
     const items = list();
+    const n = items.length;
+    grid.className = "gal-grid " + (n <= 3 ? "n" + n : (n - 1) % 4 === 0 ? "feat" : n % 4 === 0 ? "c4" : "c3");
     grid.replaceChildren(...items.map((it, i) => h("button", { class: "gal-item", "aria-label": "Open picture " + (i + 1) + " (" + it.cat + ")", onclick: () => lightbox(items, i) },
-      h("img", { src: it.u, alt: it.cat, loading: "lazy" }), cur === "all" && cats.length > 1 ? h("span", { class: "gal-tag" }, it.cat) : null)));
+      h("img", { src: it.u, alt: it.cat, loading: "lazy" }), h("span", { class: "gal-cap" }, it.cat))));
   };
   draw();
   return h("section", null, h("h3", null, "Gallery"), chips, grid);
@@ -1281,17 +1283,20 @@ function lightbox(items, start) {
     cap);
   paint(); document.body.append(el); addEventListener("keydown", key);
 }
-function slideshow(urls, color) {
+function slideshow(urls) {
   const track = h("div", { class: "slides-track" }, urls.map(u => h("div", { class: "slide" }, h("img", { src: u, alt: "", loading: "lazy" }))));
-  const dots = h("div", { class: "slides-dots" }, urls.map((_, i) => h("button", { "aria-label": "Picture " + (i + 1), onclick: () => goTo(i) })));
+  const pad = n => String(n).padStart(2, "0");
+  const count = h("span", { class: "slides-count" });
+  const bar = h("i");
   let cur = 0, timer;
-  const paint = () => [...dots.children].forEach((d, i) => { d.classList.toggle("on", i === cur); d.style.background = i === cur ? color : ""; });
+  const paint = () => { count.replaceChildren(h("b", null, pad(cur + 1)), " / " + pad(urls.length)); bar.style.width = ((cur + 1) / urls.length * 100) + "%"; };
   const goTo = i => { cur = (i + urls.length) % urls.length; track.scrollTo({ left: track.clientWidth * cur, behavior: "smooth" }); paint(); restart(); };
-  const restart = () => { clearInterval(timer); if (urls.length > 1) timer = setInterval(() => { if (!track.isConnected) return clearInterval(timer); goTo(cur + 1); }, 3500); };
+  const restart = () => { clearInterval(timer); if (urls.length > 1) timer = setInterval(() => { if (!track.isConnected) return clearInterval(timer); if (!document.hidden) goTo(cur + 1); }, 4500); };
   let st; track.addEventListener("scroll", () => { clearTimeout(st); st = setTimeout(() => { const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); if (i !== cur) { cur = i; paint(); restart(); } }, 120); });
-  const arrow = (dir, label) => urls.length > 1 ? h("button", { class: "slides-arrow " + (dir < 0 ? "prev" : "next"), "aria-label": label, onclick: () => goTo(cur + dir) }, dir < 0 ? "‹" : "›") : null;
+  const arrow = (dir, label) => h("button", { class: "slides-btn", "aria-label": label, onclick: () => goTo(cur + dir) }, svg(dir < 0 ? '<path d="M15 6l-6 6 6 6"/>' : '<path d="M9 6l6 6-6 6"/>'));
   paint(); restart();
-  return h("div", { class: "slides" }, track, arrow(-1, "Previous picture"), arrow(1, "Next picture"), urls.length > 1 ? dots : null);
+  return h("div", { class: "slides-wrap" }, h("div", { class: "slides" }, track),
+    urls.length > 1 ? h("div", { class: "slides-ctrl" }, count, h("div", { class: "slides-prog" }, bar), h("div", { class: "slides-btns" }, arrow(-1, "Previous picture"), arrow(1, "Next picture"))) : null);
 }
 function aboutTeaser(page, open) {
   const a = page.brand.about;
@@ -1314,7 +1319,7 @@ function aboutPage(page, back) {
       h("div", null, h("small", null, "About us"), h("h2", null, a.name || page.title || "About us"), a.tagline ? h("p", null, a.tagline) : null)),
     stats.length ? h("div", { class: "about-stats" }, stats.map(s => h("div", { class: "about-stat" }, h("b", null, s.value), h("span", null, s.label)))) : null,
     a.photo ? h("img", { class: "about-photo", src: a.photo, alt: "", loading: "lazy" }) : null,
-    (a.slides || []).length ? slideshow(a.slides, "#141318") : null,
+    (a.slides || []).length ? slideshow(a.slides) : null,
     a.story ? h("section", null, h("h3", null, "What we do"), h("div", { class: "about-story" }, linkify(a.story))) : null,
     galleryEl(a.gallery || []),
     wins.length ? h("section", null, h("h3", null, "What we've achieved"), h("ul", { class: "about-wins" }, wins.map(w => h("li", null, h("span", { class: "tick" }, "✓"), w)))) : null,
