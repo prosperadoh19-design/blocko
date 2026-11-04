@@ -15,7 +15,7 @@ function loadAssets() {
 
 // Section links (#about, #music…) must scroll the page, not change the app's screen.
 const ROUTES = /^#(home|terms|ads|p-|r-|v-|f-)/;
-function sectionLinks(root) {
+export function sectionLinks(root) {
   root.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest('a[href^="#"]');
     if (!a || !root.contains(a)) return;

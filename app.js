@@ -1,6 +1,7 @@
 import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
 import { phoneField, phoneOk } from "./phone.js";
 import { artistSite as artistSiteImpl, aboutSite as aboutSiteImpl } from "./artist.js";
+import { fashionSite as fashionSiteImpl } from "./fashion.js";
 // never print "null"/"false" when an optional piece of the screen is left out
 for (const m of ["append", "replaceChildren", "prepend"]) { const orig = Element.prototype[m]; Element.prototype[m] = function (...n) { return orig.apply(this, n.filter(x => x != null && x !== false)); }; }
 
@@ -68,6 +69,8 @@ const TYPES = {
   profile: { name: "Artist profile", ic: "★", c: "#141318", content: true },
   tour: { name: "Tour / show dates", ic: "🎫", c: "#141318", content: true },
   video: { name: "Videos", ic: "▶", c: "#141318", content: true },
+  maison: { name: "Brand profile", ic: "✦", c: "#141318", content: true },
+  lookbook: { name: "Lookbook", ic: "👗", c: "#141318", content: true },
   short: { name: "Short answer", ic: "Aa", c: "#7b3ff2" },
   long: { name: "Paragraph", ic: "≡", c: "#7b3ff2" },
   email: { name: "Email", ic: "@", c: "#1f6bff" },
@@ -370,6 +373,19 @@ const TEMPLATES = {
       SHOW.gallery.make(),
       SHOW.work.make()] },
 
+  fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Nothing to fill in.",
+    brand: { layout: "fashion", cover: "backgrounds/silk.jpg", coverMode: "header", tint: 0.5 },
+    title: "Your Brand", description: "Ready-to-wear · Bridal · Bespoke tailoring",
+    blocks: () => [
+      { ...SHOW.maison.make(), season: "Autumn / Winter " + new Date().getFullYear(), heroTitle: "Elegance Defined", headline: "Crafting timeless silhouettes",
+        story: "Tell your story here: where the brand started, what you make and what makes your pieces special.\n\nAdd a second paragraph about your fabrics, your craft and the people who wear your designs.",
+        location: "Lagos, NG", since: String(new Date().getFullYear() - 5),
+        stats: [{ value: "", label: "Years" }, { value: "", label: "Runway shows" }, { value: "", label: "Boutiques" }] },
+      { ...SHOW.lookbook.make(), heading: "The collections" },
+      { ...SHOW.gallery.make(), heading: "Runway & campaign" },
+      SHOW.video.make(),
+      { ...SHOW.links.make(), items: ["Instagram", "TikTok", "Facebook", "Pinterest"].map(label => ({ label, url: "" })) }] },
+
   onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
     access: "code", accessCode: true,
     title: "Welcome to the team", description: "Please complete this before your first day. It takes about 10 minutes. Your details are only seen by HR.",
@@ -459,7 +475,7 @@ function shell(color, barRight, ...content) {
 }
 function topBar(left, right) { return h("div", { class: "bar" }, left, h("div", { class: "spacer" }), right); }
 function logo() { return h("button", { class: "logo", onclick: () => go("home"), "aria-label": "Blocko home" }, h("span", { class: "mk" }, h("i"), h("i"), h("i"), h("i")), "Blocko"); }
-function mount(...nodes) { document.body.classList.remove("about-mode", "artist-mode"); if (window.__artistAudio) { window.__artistAudio.pause(); window.__artistAudio = null; } $app.replaceChildren(...nodes.flat(9).filter(Boolean)); window.scrollTo(0, 0); }
+function mount(...nodes) { document.body.classList.remove("about-mode", "artist-mode", "fashion-mode"); if (window.__artistAudio) { window.__artistAudio.pause(); window.__artistAudio = null; } $app.replaceChildren(...nodes.flat(9).filter(Boolean)); window.scrollTo(0, 0); }
 
 /* ============================================================ sheets */
 function sheet(build) {
@@ -771,7 +787,7 @@ async function viewEditor(id) {
         grp("Dates", ["date", "time", "datetime"]),
         grp("Uploads & signature", ["imageup", "docup", "file", "signature"]),
         grp("Content", ["heading", "text", "image", "divider"]),
-        grp("Showcase (artists, portfolios)", ["profile", "album", "links", "tour", "video", "gallery", "work"])));
+        grp("Showcase (artists, brands, portfolios)", ["profile", "maison", "lookbook", "album", "links", "tour", "video", "gallery", "work"])));
     });
   }
   function blockCard(b, i) {
@@ -860,7 +876,7 @@ async function viewEditor(id) {
   const aboutBox = aboutField(page, save);
   let thanksBox = null, alertsBox = null;
   const syncStatic = () => { const st = !page.blocks.some(isQuestion); [respTab, lockPill, accessBox, alertsBox, thanksBox].forEach(e => { if (e) e.hidden = st; });
-    const artist = page.brand.layout === "artist"; [aboutTab, aboutBox].forEach(e => { if (e) e.hidden = artist; }); };
+    const artist = ["artist", "fashion"].includes(page.brand.layout); [aboutTab, aboutBox].forEach(e => { if (e) e.hidden = artist; }); };
   const accessBox = accessField(page, save, () => drawLock());
   function drawLock() {
     const a = page.access || "open";
@@ -1065,10 +1081,10 @@ function aboutField(page, save) {
 function layoutField(page, save) {
   const box = h("div", { class: "field" });
   const draw = () => {
-    const cur = page.brand.layout === "artist" ? "artist" : "standard";
-    box.replaceChildren("Page style", h("div", { class: "seg small" }, [["standard", "Standard"], ["artist", "🎤 Artist website"]].map(([k, l]) =>
-      h("button", { class: cur === k ? "on" : "", type: "button", onclick: () => { if (k === "artist") page.brand.layout = "artist"; else delete page.brand.layout; save(); draw(); toast(k === "artist" ? "Artist website style on. Tap Preview to see it." : "Standard style on."); if (window.__syncStatic) window.__syncStatic(); } }, l))),
-      h("small", { class: "muted", style: { fontWeight: 400 } }, cur === "artist" ? "A dark website to show yourself off: big header, profile, music, tour, videos, photos, credits, contacts and a player bar. Your background image fills the header." : "The normal Blocko page."));
+    const cur = ["artist", "fashion"].includes(page.brand.layout) ? page.brand.layout : "standard";
+    box.replaceChildren("Page style", h("div", { class: "seg small" }, [["standard", "Standard"], ["artist", "🎤 Artist website"], ["fashion", "👗 Fashion house"]].map(([k, l]) =>
+      h("button", { class: cur === k ? "on" : "", type: "button", onclick: () => { if (k !== "standard") page.brand.layout = k; else delete page.brand.layout; save(); draw(); toast(k === "artist" ? "Artist website style on. Tap Preview to see it." : k === "fashion" ? "Fashion house style on. Tap Preview to see it." : "Standard style on."); if (window.__syncStatic) window.__syncStatic(); } }, l))),
+      h("small", { class: "muted", style: { fontWeight: 400 } }, cur === "artist" ? "A dark website to show yourself off: big header, profile, music, tour, videos, photos, credits, contacts and a player bar. Your background image fills the header." : cur === "fashion" ? "A black-and-gold luxury website: big header, brand story, lookbook with collections and prices, runway photos, boutiques and order buttons." : "The normal Blocko page."));
   };
   draw(); return box;
 }
@@ -1152,8 +1168,9 @@ async function viewForm(id, preview) {
     h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null));
   const closed = !preview && !page.accepting;
   const about = aboutOn(page) ? page.brand.about : null;
-  const artistMode = (page.brand || {}).layout === "artist";
-  const site = artistMode ? (topBarEl, main) => artistSite(page, preview, topBarEl, main) : (topBarEl, main) => {
+  const layout = (page.brand || {}).layout;
+  const artistMode = layout === "artist" || layout === "fashion";
+  const site = layout === "fashion" ? (topBarEl, main) => fashionSite(page, preview, topBarEl, main) : layout === "artist" ? (topBarEl, main) => artistSite(page, preview, topBarEl, main) : (topBarEl, main) => {
     if (header.firstChild) header.firstChild.style.maxWidth = "1120px";
     const slot = h("div", { class: "site-main" }, main);
     let tab = "form";
@@ -1830,6 +1847,96 @@ Object.assign(SHOW, {
 });
 function artistSite(page, preview, topBarEl, main) {
   return artistSiteImpl({ h, store, toast, adSlot, safeUrl, platformOf, galleryEl, fmtTime, mount, upcoming, ytId, videoModal, linkify, reportSheet, go, isQuestion }, page, preview, topBarEl, main);
+}
+/* ---- fashion: brand profile + lookbook ---- */
+const photoSlot = (obj, key, label, hint, save, max = 1400) => {
+  const wrap = h("div", { class: "brand-slot" });
+  const draw = () => {
+    const btn = h("button", { class: "btn small dark", type: "button", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => {
+      btn.disabled = true; btn.textContent = "Uploading…";
+      try { obj[key] = await store.uploadMedia(await compressImage(f, max, false)); save(); draw(); } catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Upload"; } }) }, obj[key] ? "Change" : "Upload");
+    wrap.replaceChildren(h("div", { class: "brand-thumb" }, obj[key] ? h("img", { src: obj[key], alt: "" }) : h("span", null, "Photo")),
+      h("div", { class: "brand-acts" }, h("b", null, label), h("small", { class: "muted" }, hint), h("div", { style: { display: "flex", gap: "6px" } }, btn, obj[key] ? h("button", { class: "btn small", type: "button", onclick: () => { obj[key] = ""; save(); draw(); } }, "Remove") : "")));
+  };
+  draw(); return wrap;
+};
+Object.assign(SHOW, {
+  maison: {
+    make: () => ({ id: uuid(), type: "maison", season: "", heroTitle: "", photo: "", headline: "", story: "", location: "", since: "", stats: [], press: "", boutiques: [], email: "", phone: "", appointments: "" }),
+    preview: b => h("div", { class: "sc-prev" }, b.photo ? h("img", { class: "sc-prev-cover", src: b.photo, alt: "" }) : h("div", { class: "sc-prev-cover empty" }, "✦"),
+      h("div", null, h("b", null, b.heroTitle || b.headline || "Brand profile"), h("div", { class: "muted" }, [b.season, b.location].filter(Boolean).join(" · ") || "Header, story, stats, boutiques and contacts"))),
+    edit(b, g, save) {
+      g.append(
+        h("div", { class: "field" }, h("b", null, "Top of the page")),
+        lbl("Small line above the title", fld(b, "season", "e.g. Autumn / Winter 2026 Collection", save, { max: 60 })),
+        lbl("Big title", fld(b, "heroTitle", "e.g. Elegance Defined", save, { max: 40 })),
+        h("div", { class: "field" }, h("b", null, "The brand")),
+        photoSlot(b, "photo", "Designer or brand photo", "A tall portrait photo looks best.", save, 1200),
+        lbl("Headline", fld(b, "headline", "e.g. Crafting timeless silhouettes", save, { max: 80 })),
+        lbl("Your story", fld(b, "story", "Who you are, what you make, your fabrics and craft. Use an empty line for a new paragraph.", save, { area: true, max: 2000, h: "130px" })),
+        h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, lbl("Based in", fld(b, "location", "Lagos, NG", save)), lbl("Founded", fld(b, "since", "2018", save, { max: 10 }))),
+        h("div", { class: "field" }, "Big numbers (up to 3)", listEditor(b, "stats", 3, "Add a number", it => h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 2fr" } }, fld(it, "value", "12+", save, { max: 12 }), fld(it, "label", "Years", save, { max: 30 })), () => ({ value: "", label: "" }), save)),
+        lbl("As seen in (separate with commas)", fld(b, "press", "e.g. Lagos Fashion Week, GTCO Fashion Weekend, BellaNaija Style", save, { max: 200 })),
+        h("div", { class: "field" }, "Boutiques / studios (up to 6)", listEditor(b, "boutiques", 6, "Add a boutique", it => h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "city", "City, e.g. Lekki, Lagos", save, { max: 40 }), fld(it, "address", "Address", save, { max: 120 }), fld(it, "hours", "Opening hours, e.g. Mon–Sat 10am – 7pm", save, { max: 60 })), () => ({ city: "", address: "", hours: "" }), save)),
+        h("div", { class: "field" }, h("b", null, "Orders & appointments")),
+        lbl("Email", fld(b, "email", "orders@yourbrand.com", save, { type: "email", max: 120 })),
+        lbl("Phone / WhatsApp", phoneField(h, { value: b.phone || "", onChange: v => { b.phone = v; save(); } })),
+        lbl("Appointment note (optional)", fld(b, "appointments", "e.g. Private fittings by appointment. Custom orders take 2–3 weeks.", save, { max: 160 })));
+    },
+    view(b) {
+      if (!b.headline && !b.story && !b.photo) return null;
+      return h("section", { class: "fblock sc" }, scLabel(b, "The brand"),
+        h("div", { class: "pf" }, b.photo ? h("img", { class: "pf-photo", src: b.photo, alt: "" }) : null,
+          h("div", { class: "pf-body" }, b.headline ? h("h2", null, b.headline) : null, b.story ? h("div", { class: "about-story" }, linkify(b.story)) : null)));
+    }
+  },
+  lookbook: {
+    make: () => ({ id: uuid(), type: "lookbook", heading: "", items: [] }),
+    preview: b => (b.items || []).length ? h("div", { class: "slide-thumbs" }, b.items.slice(0, 8).map(it => h("div", { class: "slide-thumb" }, it.img ? h("img", { src: it.img, alt: "" }) : null)), b.items.length > 8 ? h("span", { class: "muted" }, "+" + (b.items.length - 8)) : null) : h("span", { class: "muted" }, "No looks yet"),
+    edit(b, g, save) {
+      const box = h("div", { class: "edit-grid", style: { gap: "10px" } });
+      const MAX = 60;
+      const draw = () => {
+        const list = b.items || (b.items = []);
+        const cols = [...new Set(list.map(x => (x.collection || "").trim()).filter(Boolean))];
+        const dl = h("datalist", { id: "cols-" + b.id }, cols.map(c => h("option", { value: c })));
+        const addMany = h("button", { class: "btn small dark", type: "button", onclick: () => {
+          const i = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", multiple: true });
+          i.onchange = async () => {
+            const files = [...i.files].slice(0, MAX - list.length); if (!files.length) return;
+            addMany.disabled = true;
+            for (let k = 0; k < files.length; k++) { addMany.lastChild.textContent = "Uploading " + (k + 1) + " of " + files.length + "…";
+              try { list.push({ img: await store.uploadMedia(await compressImage(files[k], 1400, false)), title: "", price: "", collection: cols[0] || "", desc: "", url: "" }); save(); } catch (e) { toast(e.message); } }
+            draw(); toast("Looks added. Give each one a name and price.");
+          };
+          i.click();
+        } }, icon("plus"), h("span", null, list.length ? "Add more looks" : "Add looks (pick several photos)"));
+        box.replaceChildren(dl, ...list.map((it, i) => h("div", { class: "wk-ed lk-look" },
+          h("div", { class: "wk-ed-top" }, h("button", { class: "wk-pic tall", type: "button", title: "Change photo", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => { try { it.img = await store.uploadMedia(await compressImage(f, 1400, false)); save(); draw(); } catch (e) { toast(e.message); } }) },
+              it.img ? h("img", { src: it.img, alt: "" }) : h("span", null, "+ Photo")),
+            h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "Look name, e.g. Silk evening gown", save),
+              h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, fld(it, "price", "Price, e.g. ₦350,000", save, { max: 30 }),
+                h("input", { class: "input", value: it.collection || "", placeholder: "Collection, e.g. Bridal", maxLength: 40, list: "cols-" + b.id, "aria-label": "Collection", oninput: e => { it.collection = e.target.value; save(); }, onchange: () => draw() })),
+              fld(it, "desc", "Details: fabric, colours, sizes (optional)", save, { max: 240 }),
+              fld(it, "url", "Shop link (optional, https://…)", save, { type: "url", max: 300 }))),
+          h("div", { class: "wk-ed-tools" },
+            h("button", { class: "icon-btn", type: "button", "aria-label": "Move up", disabled: i === 0, onclick: () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; save(); draw(); } }, icon("up")),
+            h("button", { class: "btn small", type: "button", style: { color: "var(--danger)" }, onclick: () => { list.splice(i, 1); save(); draw(); } }, "Delete")))),
+          list.length < MAX ? h("div", null, addMany) : "", h("small", { class: "muted" }, list.length + " / " + MAX + " looks. Use the same collection name to group looks (e.g. Bridal, Ready-to-wear, Men)."));
+      };
+      draw();
+      g.append(scHeadingInput(b, "The collections", save), box);
+    },
+    view(b) {
+      const items = (b.items || []).filter(x => x.img);
+      if (!items.length) return null;
+      return h("section", { class: "fblock sc" }, scLabel(b, "Lookbook"), h("div", { class: "vd-grid" }, items.map(x => h("div", { class: "vd" }, h("span", { class: "vd-thumb" }, h("img", { src: x.img, alt: x.title || "", loading: "lazy" })), h("b", null, x.title || ""), x.price ? h("small", { class: "muted" }, x.price) : null))));
+    }
+  }
+});
+
+function fashionSite(page, preview, topBarEl, main) {
+  return fashionSiteImpl({ h, store, toast, adSlot, safeUrl, platformOf, galleryEl, lightbox, mount, ytId, videoModal, linkify, reportSheet, go, isQuestion }, page, preview, topBarEl, main);
 }
 function upcoming(items) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
