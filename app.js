@@ -1,5 +1,6 @@
 import { createStore, uuid, LIMITS, TERMS_VERSION } from "./store.js";
 import { phoneField, phoneOk } from "./phone.js";
+import { artistSite as artistSiteImpl } from "./artist.js";
 // never print "null"/"false" when an optional piece of the screen is left out
 for (const m of ["append", "replaceChildren", "prepend"]) { const orig = Element.prototype[m]; Element.prototype[m] = function (...n) { return orig.apply(this, n.filter(x => x != null && x !== false)); }; }
 
@@ -64,6 +65,9 @@ const TYPES = {
   links: { name: "Social links", ic: "↗", c: "#141318", content: true },
   gallery: { name: "Photo gallery", ic: "▦", c: "#141318", content: true },
   work: { name: "Work & credits", ic: "◆", c: "#141318", content: true },
+  profile: { name: "Artist profile", ic: "★", c: "#141318", content: true },
+  tour: { name: "Tour / show dates", ic: "🎫", c: "#141318", content: true },
+  video: { name: "Videos", ic: "▶", c: "#141318", content: true },
   short: { name: "Short answer", ic: "Aa", c: "#7b3ff2" },
   long: { name: "Paragraph", ic: "≡", c: "#7b3ff2" },
   email: { name: "Email", ic: "@", c: "#1f6bff" },
@@ -350,14 +354,25 @@ const TEMPLATES = {
       Q("long", "Anything else we should know?"),
       Q("consent", "I understand that work starts after the deposit is paid.", { required: true })] },
 
-  artist: { name: "Music artist page", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Stream your album, share your links, photos and past work. Listen only, no downloads.",
-    title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria",
+  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "A dark artist site: stream your songs, tour dates, videos, photos, credits and bookings.",
+    brand: { layout: "artist", cover: "backgrounds/stage.jpg", coverMode: "header", tint: 0.5 },
+    title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria. Write one line about your sound here.",
+    thank_you: "Thank you! Your message has been sent to management. We'll reply soon.",
     blocks: () => [
-      C("text", "Write a short bio here: who you are, your sound, where you're from and what you're working on now. Two or three sentences is perfect."),
+      { ...SHOW.profile.make(), badge: 'New single out now', headline: "Write a strong headline about your music.",
+        bio: "Write your story here: where you're from, your sound and what makes your music different.\n\nAdd a second paragraph about your biggest shows, collaborations or your newest project.",
+        location: "Lagos, NG", label: "Independent", since: String(new Date().getFullYear() - 3), genres: "Afrobeats, R&B",
+        stats: [{ value: "", label: "Monthly listeners" }, { value: "", label: "Total streams" }, { value: "", label: "Shows played" }],
+        highlights: [{ title: "", sub: "" }] },
       { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()) },
       { ...SHOW.links.make(), items: ["Spotify", "Apple Music", "Audiomack", "Boomplay", "YouTube", "Instagram", "TikTok"].map(label => ({ label, url: "" })) },
+      { ...SHOW.tour.make(), items: [{ city: "", venue: "", date: "", time: "", status: "", url: "" }] },
+      SHOW.video.make(),
       SHOW.gallery.make(),
-      SHOW.work.make()] },
+      SHOW.work.make(),
+      Q("short", "Your name", { required: true }), Q("email", "Email address", { required: true }), Q("phone", "Phone / WhatsApp"),
+      Q("dropdown", "Inquiry type", { required: true, ...opts("Show / event booking", "Feature or collaboration", "Press & media interview", "Brand partnership", "General inquiry") }),
+      Q("long", "Message", { required: true, help: "Tell us about your event or request: date, place and budget." })] },
 
   onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
     access: "code", accessCode: true,
@@ -448,7 +463,7 @@ function shell(color, barRight, ...content) {
 }
 function topBar(left, right) { return h("div", { class: "bar" }, left, h("div", { class: "spacer" }), right); }
 function logo() { return h("button", { class: "logo", onclick: () => go("home"), "aria-label": "Blocko home" }, h("span", { class: "mk" }, h("i"), h("i"), h("i"), h("i")), "Blocko"); }
-function mount(...nodes) { document.body.classList.remove("about-mode"); $app.replaceChildren(...nodes.flat(9).filter(Boolean)); window.scrollTo(0, 0); }
+function mount(...nodes) { document.body.classList.remove("about-mode", "artist-mode"); if (window.__artistAudio) { window.__artistAudio.pause(); window.__artistAudio = null; } $app.replaceChildren(...nodes.flat(9).filter(Boolean)); window.scrollTo(0, 0); }
 
 /* ============================================================ sheets */
 function sheet(build) {
@@ -749,7 +764,7 @@ async function viewEditor(id) {
         grp("Dates", ["date", "time", "datetime"]),
         grp("Uploads & signature", ["imageup", "docup", "file", "signature"]),
         grp("Content", ["heading", "text", "image", "divider"]),
-        grp("Showcase (artists, portfolios)", ["album", "links", "gallery", "work"])));
+        grp("Showcase (artists, portfolios)", ["profile", "album", "links", "tour", "video", "gallery", "work"])));
     });
   }
   function blockCard(b, i) {
@@ -847,6 +862,7 @@ async function viewEditor(id) {
   const side = h("aside", { class: "side-card" },
     h("h3", null, "Page settings"),
     h("div", { class: "field" }, "Color", colorRow),
+    layoutField(page, save),
     brandBox,
     aboutBox,
     h("label", { class: "field" }, "Message after someone submits", thanks),
@@ -1029,6 +1045,17 @@ function aboutField(page, save) {
   draw(); return box;
 }
 
+function layoutField(page, save) {
+  const box = h("div", { class: "field" });
+  const draw = () => {
+    const cur = page.brand.layout === "artist" ? "artist" : "standard";
+    box.replaceChildren("Page style", h("div", { class: "seg small" }, [["standard", "Standard"], ["artist", "🎤 Artist website (dark)"]].map(([k, l]) =>
+      h("button", { class: cur === k ? "on" : "", type: "button", onclick: () => { if (k === "artist") page.brand.layout = "artist"; else delete page.brand.layout; save(); draw(); toast(k === "artist" ? "Artist website style on. Tap Preview to see it." : "Standard style on."); } }, l))),
+      h("small", { class: "muted", style: { fontWeight: 400 } }, cur === "artist" ? "A dark music website: big header, discography, tour, videos, booking form and a player bar. Your background image fills the header." : "The normal Blocko page."));
+  };
+  draw(); return box;
+}
+
 function accessField(page, save, onChange) {
   const box = h("div", { class: "field" }, h("span", { style: { display: "flex", gap: "6px", alignItems: "center" } }, svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'), "Who can fill this in?"));
   const opts = h("div", { class: "access-opts" });
@@ -1108,7 +1135,8 @@ async function viewForm(id, preview) {
     h("h1", null, page.title || "Untitled page"), page.description ? h("p", null, linkify(page.description)) : null));
   const closed = !preview && !page.accepting;
   const about = aboutOn(page) ? page.brand.about : null;
-  const site = (topBarEl, main) => {
+  const artistMode = (page.brand || {}).layout === "artist";
+  const site = artistMode ? (topBarEl, main) => artistSite(page, preview, topBarEl, main) : (topBarEl, main) => {
     if (header.firstChild) header.firstChild.style.maxWidth = "1120px";
     const slot = h("div", { class: "site-main" }, main);
     let tab = "form";
@@ -1121,7 +1149,10 @@ async function viewForm(id, preview) {
       siteFooter(preview ? null : page.id));
   };
   const body = h("div", { class: "form-page" + (page.blocks.some(b => SHOW[b.type]) ? " showcase" : "") });
+  let seenQ = false;
   page.blocks.forEach(b => {
+    if (isQuestion(b)) seenQ = true;
+    else if (artistMode && (SHOW[b.type] || !seenQ)) return; // the artist layout draws these itself
     if (b.type === "heading") return body.append(h("div", { class: "fblock heading" }, h("h2", null, b.text)));
     if (b.type === "text") return body.append(h("div", { class: "fblock text" }, linkify(b.text)));
     if (SHOW[b.type]) { const el = SHOW[b.type].view(b, page); return el ? body.append(el) : null; }
@@ -1196,10 +1227,11 @@ async function viewForm(id, preview) {
       }
     }
     box.append(ctrl); blockEls[b.id] = box; body.append(box);
-    if (Object.keys(blockEls).length === 3) body.append(h("div", { class: "ad-inline" }, adSlot()));
+    if (!artistMode && Object.keys(blockEls).length === 3) body.append(h("div", { class: "ad-inline" }, adSlot()));
   });
-  const btn = h("button", { class: "btn", type: "submit", disabled: closed }, preview ? "Submit (disabled in preview)" : "Submit");
-  if (!page.blocks.some(isQuestion)) body.append(h("div", { class: "ad-inline" }, adSlot()));
+  const sendLabel = artistMode ? "Send message" : "Submit";
+  const btn = h("button", { class: "btn", type: "submit", disabled: closed }, preview ? sendLabel + " (disabled in preview)" : sendLabel);
+  if (!artistMode && !page.blocks.some(isQuestion)) body.append(h("div", { class: "ad-inline" }, adSlot()));
   const form = h("form", { novalidate: true, onsubmit: async e => {
     e.preventDefault(); if (preview) { toast("This is a preview. Publish the page to collect answers."); return; }
     let first = null;
@@ -1235,7 +1267,7 @@ async function viewForm(id, preview) {
         h("p", { class: "muted", style: { fontSize: "18px" } }, page.thank_you || "Thanks! We got your answers."),
         h("button", { class: "btn", onclick: () => route() }, "Send another response")), h("div", { class: "ad-inline after" }, adSlot())));
       window.scrollTo(0, 0);
-    } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Submit"; }
+    } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = sendLabel; }
   } }, body, !page.blocks.some(isQuestion) ? null : h("div", { class: "form-page", style: { marginTop: 0 } }, h("div", { class: "submit-row" }, btn, closed ? h("span", { class: "muted" }, "This form is closed to new responses.") : h("span", { class: "muted", style: { fontSize: "14px" } }, "Never send passwords through forms."))));
   const access = page.access || "open";
   if (access === "open" || closed) {
@@ -1667,6 +1699,122 @@ const SHOW = {
     }
   }
 };
+
+/* ---- more showcase blocks: artist profile, tour dates, videos ---- */
+const ytId = u => { const m = /(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/.exec(u || ""); return m ? m[1] : null; };
+const listEditor = (b, key, max, addLabel, row, blank, save, newestFirst) => {
+  const box = h("div", { class: "edit-grid", style: { gap: "10px" } });
+  const draw = () => {
+    const list = b[key] || (b[key] = []);
+    box.replaceChildren(...list.map((it, i) => h("div", { class: "wk-ed" }, row(it, draw),
+      h("div", { class: "wk-ed-tools" },
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Move up", disabled: i === 0, onclick: () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; save(); draw(); } }, icon("up")),
+        h("button", { class: "btn small", type: "button", style: { color: "var(--danger)" }, onclick: () => { list.splice(i, 1); save(); draw(); } }, "Delete")))),
+      list.length < max ? h("button", { class: "add-btn", style: { justifySelf: "start" }, type: "button", onclick: () => { newestFirst ? list.unshift(blank()) : list.push(blank()); save(); draw(); } }, icon("plus"), addLabel) : "");
+  };
+  draw(); return box;
+};
+const fld = (obj, k, ph, save, o = {}) => h(o.area ? "textarea" : "input", { class: o.area ? "textarea" : "input", type: o.type || (o.area ? null : "text"), value: obj[k] || "", placeholder: ph, maxLength: o.max || 80, style: o.area ? { minHeight: o.h || "70px" } : null, "aria-label": o.label || ph,
+  oninput: e => { obj[k] = e.target.value; save(); }, onblur: o.type === "url" ? e => { if (e.target.value && !/^https?:\/\//i.test(e.target.value)) { obj[k] = e.target.value = "https://" + e.target.value.trim(); save(); } } : null });
+const lbl = (text, el) => h("label", { class: "field" }, text, el);
+const TOUR_STATUS = ["", "Selling fast", "Low stock", "General sale", "Free entry", "Sold out"];
+
+Object.assign(SHOW, {
+  profile: {
+    make: () => ({ id: uuid(), type: "profile", photo: "", badge: "", headline: "", bio: "", location: "", label: "", since: "", genres: "", stats: [], highlights: [], bookingEmail: "", pressEmail: "" }),
+    preview: b => h("div", { class: "sc-prev" }, b.photo ? h("img", { class: "sc-prev-cover", src: b.photo, alt: "" }) : h("div", { class: "sc-prev-cover empty" }, "★"),
+      h("div", null, h("b", null, b.headline || "Artist profile"), h("div", { class: "muted" }, [b.location, b.genres].filter(Boolean).join(" · ") || "Photo, bio, stats and highlights"))),
+    edit(b, g, save) {
+      const photo = h("div", { class: "brand-slot" });
+      const drawPhoto = () => {
+        const btn = h("button", { class: "btn small dark", type: "button", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => {
+          btn.disabled = true; btn.textContent = "Uploading…";
+          try { b.photo = await store.uploadMedia(await compressImage(f, 1200, false)); save(); drawPhoto(); } catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Upload"; } }) }, b.photo ? "Change" : "Upload");
+        photo.replaceChildren(h("div", { class: "brand-thumb" }, b.photo ? h("img", { src: b.photo, alt: "" }) : h("span", null, "Photo")),
+          h("div", { class: "brand-acts" }, h("b", null, "Artist photo"), h("small", { class: "muted" }, "A tall portrait photo looks best."), h("div", { style: { display: "flex", gap: "6px" } }, btn, b.photo ? h("button", { class: "btn small", type: "button", onclick: () => { b.photo = ""; save(); drawPhoto(); } }, "Remove") : "")));
+      };
+      drawPhoto();
+      g.append(photo,
+        lbl("Top banner text (optional)", fld(b, "badge", 'e.g. New album "Lagos Nights" out now', save, { max: 70 })),
+        lbl("Headline", fld(b, "headline", "e.g. Afrobeats from Lagos to the world.", save, { max: 90 })),
+        lbl("Bio", fld(b, "bio", "Who you are, your sound, your story. Use an empty line to start a new paragraph.", save, { area: true, max: 2000, h: "140px" })),
+        h("div", { class: "sc-row2" }, lbl("Based in", fld(b, "location", "Lagos, NG", save)), lbl("Label", fld(b, "label", "Independent", save)), lbl("Active since", fld(b, "since", "2019", save, { max: 10 }))),
+        lbl("Genres (separate with commas)", fld(b, "genres", "Afrobeats, R&B, Amapiano", save, { max: 80 })),
+        h("div", { class: "field" }, "Big numbers (up to 3)", listEditor(b, "stats", 3, "Add a number", it => h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 2fr" } }, fld(it, "value", "4.8M+", save, { max: 12 }), fld(it, "label", "Monthly listeners", save, { max: 30 })), () => ({ value: "", label: "" }), save)),
+        h("div", { class: "field" }, "Achievements (up to 6)", listEditor(b, "highlights", 6, "Add an achievement", it => h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "e.g. Best New Artist", save, { max: 40 }), fld(it, "sub", "e.g. Headies Awards 2025", save, { max: 60 })), () => ({ title: "", sub: "" }), save)),
+        h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, lbl("Booking email", fld(b, "bookingEmail", "booking@you.com", save, { type: "email", max: 120 })), lbl("Press email", fld(b, "pressEmail", "press@you.com", save, { type: "email", max: 120 }))));
+    },
+    view(b) {
+      if (!b.headline && !b.bio && !b.photo) return null;
+      const stats = (b.stats || []).filter(x => x.value);
+      return h("section", { class: "fblock sc" }, scLabel(b, "About"),
+        h("div", { class: "pf" }, b.photo ? h("img", { class: "pf-photo", src: b.photo, alt: "" }) : null,
+          h("div", { class: "pf-body" }, b.headline ? h("h2", null, b.headline) : null,
+            h("div", { class: "muted" }, [b.location, b.label, b.since && "Since " + b.since].filter(Boolean).join(" · ")),
+            b.bio ? h("div", { class: "about-story" }, linkify(b.bio)) : null,
+            stats.length ? h("div", { class: "about-stats" }, stats.map(x => h("div", { class: "about-stat" }, h("b", null, x.value), h("span", null, x.label)))) : null)));
+    }
+  },
+  tour: {
+    make: () => ({ id: uuid(), type: "tour", heading: "", items: [] }),
+    preview: b => { const n = (b.items || []).filter(t => t.date).length; return h("span", { class: "muted" }, n ? n + " date" + (n === 1 ? "" : "s") : "No dates yet"); },
+    edit(b, g, save) {
+      g.append(scHeadingInput(b, "Tour dates", save), h("small", { class: "muted" }, "Past dates hide by themselves."),
+        listEditor(b, "items", 30, "Add a date", it => h("div", { class: "edit-grid", style: { gap: "6px" } },
+          h("div", { class: "sc-row2" }, fld(it, "city", "City, e.g. Lagos, NG", save), fld(it, "date", "", save, { type: "date", label: "Date" }), fld(it, "time", "", save, { type: "time", label: "Time" })),
+          h("div", { class: "sc-row2" }, fld(it, "venue", "Venue, e.g. Eko Convention Centre", save), h("select", { class: "select", "aria-label": "Ticket status", onchange: e => { it.status = e.target.value; save(); } }, TOUR_STATUS.map(st => h("option", { value: st, selected: (it.status || "") === st }, st || "No label"))), h("span")),
+          fld(it, "url", "Ticket link (https://…)", save, { type: "url", max: 300 })), () => ({ city: "", venue: "", date: "", time: "", status: "", url: "" }), save));
+    },
+    view(b) {
+      const items = upcoming(b.items);
+      if (!items.length) return null;
+      return h("section", { class: "fblock sc" }, scLabel(b, "Tour dates"), h("div", { class: "wk-list" }, items.map(t => h("article", { class: "wk" },
+        h("div", { class: "wk-logo mono", style: { flexDirection: "column", lineHeight: 1.1 } }, h("small", { style: { fontSize: "10px" } }, t.mon), h("b", null, t.day)),
+        h("div", { class: "wk-body" }, h("h4", null, t.city || t.venue), h("div", { class: "wk-org" }, [t.venue, t.timeLabel].filter(Boolean).join(" · ")), t.status ? h("div", { class: "wk-date" }, t.status) : null,
+          t.href && t.status !== "Sold out" ? h("a", { class: "wk-link", href: t.href, target: "_blank", rel: "noopener" }, "Tickets ↗") : null)))));
+    }
+  },
+  video: {
+    make: () => ({ id: uuid(), type: "video", heading: "", channel: "", items: [] }),
+    preview: b => { const n = (b.items || []).filter(v => v.url).length; return h("span", { class: "muted" }, n ? n + " video" + (n === 1 ? "" : "s") : "No videos yet"); },
+    edit(b, g, save) {
+      g.append(scHeadingInput(b, "Official videos", save), lbl("YouTube channel link (optional)", fld(b, "channel", "https://youtube.com/@yourname", save, { type: "url", max: 300 })),
+        h("small", { class: "muted" }, "Paste YouTube links. The picture and player are added for you."),
+        listEditor(b, "items", 12, "Add a video", it => h("div", { class: "edit-grid", style: { gap: "6px" } },
+          fld(it, "url", "YouTube link, e.g. https://youtu.be/…", save, { type: "url", max: 300 }),
+          h("div", { class: "sc-row2", style: { gridTemplateColumns: "2fr 1fr" } }, fld(it, "title", "Video title", save), fld(it, "kind", "Music video", save, { max: 30 })),
+          fld(it, "desc", "Short line, e.g. Directed by … · 2026", save, { max: 120 })), () => ({ url: "", title: "", kind: "", desc: "" }), save));
+    },
+    view(b) {
+      const items = (b.items || []).filter(v => ytId(v.url));
+      if (!items.length) return null;
+      return h("section", { class: "fblock sc" }, scLabel(b, "Videos"), h("div", { class: "vd-grid" }, items.map(v => h("button", { class: "vd", type: "button", onclick: () => videoModal(ytId(v.url)) },
+        h("span", { class: "vd-thumb" }, h("img", { src: "https://i.ytimg.com/vi/" + ytId(v.url) + "/hqdefault.jpg", alt: "", loading: "lazy" }), h("i", null, "▶")),
+        h("b", null, v.title || "Watch"), v.desc ? h("small", { class: "muted" }, v.desc) : null))));
+    }
+  }
+});
+function artistSite(page, preview, topBarEl, main) {
+  return artistSiteImpl({ h, store, toast, adSlot, safeUrl, platformOf, galleryEl, fmtTime, mount, upcoming, ytId, videoModal, linkify, reportSheet, go, isQuestion }, page, preview, topBarEl, main);
+}
+function upcoming(items) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return (items || []).filter(t => t.date && new Date(t.date + "T00:00") >= today).sort((a, b) => a.date.localeCompare(b.date)).map(t => {
+    const d = new Date(t.date + "T00:00");
+    let timeLabel = "";
+    if (t.time) { const [H, M] = t.time.split(":").map(Number); timeLabel = ((H % 12) || 12) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM"); }
+    return { ...t, mon: d.toLocaleString("en", { month: "short" }).toUpperCase(), day: String(d.getDate()).padStart(2, "0"), year: d.getFullYear(), timeLabel, href: t.url && safeUrl(t.url) };
+  });
+}
+function videoModal(id) {
+  const close = () => { el.remove(); removeEventListener("keydown", key); };
+  const key = e => { if (e.key === "Escape") close(); };
+  const el = h("div", { class: "lightbox vd-modal", role: "dialog", "aria-modal": "true", onclick: e => { if (e.target === el) close(); } },
+    h("button", { class: "lb-close", "aria-label": "Close video", onclick: close }, "✕"),
+    h("div", { class: "vd-frame" }, h("iframe", { src: "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0", title: "Video player", allow: "autoplay; encrypted-media; picture-in-picture; fullscreen", allowFullscreen: true })));
+  document.body.append(el); addEventListener("keydown", key);
+  if (nowPlaying) nowPlaying.pause();
+}
 
 function siteNav(page, preview, tabs) {
   const b = page.brand || {};
