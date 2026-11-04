@@ -408,6 +408,7 @@ const TEMPLATES = {
       Q("long", "Message", { required: true, help: "Tell us about your event or request: date, place and budget." })] },
 
   fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample photos you can replace.",
+    thank_you: "Thank you! Your inquiry has been received. Our team will contact you shortly.",
     brand: { layout: "fashion", cover: UNSPLASH(FASHION_PHOTOS.hangers), coverMode: "header", tint: 0.5 },
     title: "Your Brand", description: "Ready-to-wear · Bridal · Bespoke tailoring",
     blocks: () => {
@@ -419,7 +420,7 @@ const TEMPLATES = {
           stats: [{ value: "8+", label: "Years" }, { value: "12", label: "Runway shows" }, { value: "2", label: "Boutiques" }],
           press: "Lagos Fashion Week, GTCO Fashion Weekend, Arise Fashion Week",
           boutiques: [{ city: "Lekki, Lagos", address: "Your boutique address", hours: "Mon–Sat 10am – 7pm" }],
-          appointments: "Private fittings by appointment. Custom orders take 2–3 weeks." },
+          appointments: "Private fittings by appointment. Custom orders take 2–3 weeks.", email: "hello@yourbrand.com", phone: "+234 8000000000" },
         { ...SHOW.lookbook.make(), heading: "The collections", items: [
           ["redGown", "Red silk evening gown", "₦450,000", "Evening", "Flowing red silk with a fitted bodice."],
           ["bridal", "Lace bridal gown", "₦1,200,000", "Bridal", "Ivory lace with a long train, made to measure."],
@@ -431,7 +432,11 @@ const TEMPLATES = {
         ].map(([k, title, price, collection, desc]) => ({ img: F(k, 900, 1200), title, price, collection, desc, url: "" })) },
         { ...SHOW.gallery.make(), heading: "Runway & campaign", images: ["runway", "show", "yellowWall", "sketches", "rack"].map(k => F(k, 1600)) },
         SHOW.video.make(),
-        { ...SHOW.links.make(), items: ["Instagram", "TikTok", "Facebook", "Pinterest"].map(label => ({ label, url: "" })) }];
+        { ...SHOW.links.make(), items: [["Instagram", "https://www.instagram.com"], ["TikTok", "https://www.tiktok.com"], ["Facebook", "https://www.facebook.com"], ["Pinterest", "https://www.pinterest.com"]].map(([label, url]) => ({ label, url })) },
+        Q("short", "Your full name", { required: true }), Q("email", "Email address", { required: true }), Q("phone", "Phone / WhatsApp"),
+        Q("checkbox", "What is this about?", { required: true, ...opts("Private appointment / fitting", "Custom order", "Bridal", "Buy a look from the collection", "Press & PR", "Other") }),
+        Q("date", "Preferred date"),
+        Q("long", "Inquiry / appointment details", { required: true, help: "Tell us what you'd like, sizes, the occasion and your budget." })];
     } },
 
   onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
@@ -1314,7 +1319,7 @@ async function viewForm(id, preview) {
     box.append(ctrl); blockEls[b.id] = box; body.append(box);
     if (!artistMode && Object.keys(blockEls).length === 3) body.append(h("div", { class: "ad-inline" }, adSlot()));
   });
-  const sendLabel = artistMode ? "Send message" : "Submit";
+  const sendLabel = layout === "fashion" ? "Submit inquiry" : artistMode ? "Send message" : "Submit";
   const btn = h("button", { class: "btn", type: "submit", disabled: closed }, preview ? sendLabel + " (disabled in preview)" : sendLabel);
   if (!artistMode && !page.blocks.some(isQuestion)) body.append(h("div", { class: "ad-inline" }, adSlot()));
   const form = h("form", { novalidate: true, onsubmit: async e => {
