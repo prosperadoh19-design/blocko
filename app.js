@@ -56,7 +56,8 @@ function linkify(text) {
 /* ============================================================ content model */
 const BACKGROUNDS = [["Sunset", "sunset"], ["Ocean", "ocean"], ["City night", "city"], ["Colors", "colors"],
   ["Gold waves", "gold-waves"], ["Gold silk", "silk"], ["Gold dust", "atelier"], ["Rose gold", "rose-gold"], ["Emerald", "emerald-waves"], ["Royal blue", "royal-blue"],
-  ["Neon glow", "neon"], ["Stage lights", "stage"], ["Aurora", "aurora"], ["Sunset city", "sunset-sky"], ["Desert", "dunes"], ["Forest", "forest"],
+  ["Neon glow", "neon"], ["Stage lights", "stage"], ["Concert", "concert"], ["Vinyl", "vinyl"], ["Turntable", "turntable"], ["Equalizer", "equalizer"],
+  ["Sound waves", "sound-waves"], ["Studio mic", "studio-mic"], ["Headphones", "headphones"], ["Neon notes", "neon-music"], ["Aurora", "aurora"], ["Sunset city", "sunset-sky"], ["Desert", "dunes"], ["Forest", "forest"],
   ["Ankara", "ankara"], ["Gold lines", "geometric"], ["Smoke", "black-marble"], ["Clouds", "marble"], ["Linen", "linen"], ["Office", "office"]]
   .map(([n, f]) => [n, "backgrounds/" + f + ".jpg", "backgrounds/thumbs/" + f + ".jpg"]);
 const COLORS = ["#7b3ff2", "#ff5a1f", "#ff3e9a", "#1f6bff", "#00b86b", "#00a7a7", "#e0a800", "#141318"];
@@ -361,20 +362,22 @@ const TEMPLATES = {
       Q("long", "Anything else we should know?"),
       Q("consent", "I understand that work starts after the deposit is paid.", { required: true })] },
 
-  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Show yourself off: a web page with your music, tour dates, videos, photos, credits and booking contacts. Nothing to fill in.",
+  artist: { name: "Music artist website", emoji: "🎤", color: COLORS[7], cat: "Music", d: "Show yourself off: a web page with your music, tour dates, videos, photos, credits and booking contacts. Comes with sample pictures you can replace.",
     brand: { layout: "artist", cover: "backgrounds/stage.jpg", coverMode: "header", tint: 0.5 },
     title: "Your artist name", description: "Singer · Songwriter · Lagos, Nigeria. Write one line about your sound here.",
     blocks: () => [
-      { ...SHOW.profile.make(), badge: 'New single out now', headline: "Write a strong headline about your music.",
+      { ...SHOW.profile.make(), photo: "samples/artist/artist-photo.jpg", badge: 'New single out now', headline: "Write a strong headline about your music.",
         bio: "Write your story here: where you're from, your sound and what makes your music different.\n\nAdd a second paragraph about your biggest shows, collaborations or your newest project.",
         location: "Lagos, NG", label: "Independent", since: String(new Date().getFullYear() - 3), genres: "Afrobeats, R&B",
-        stats: [{ value: "", label: "Monthly listeners" }, { value: "", label: "Total streams" }, { value: "", label: "Shows played" }],
-        highlights: [{ title: "", sub: "" }] },
-      { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()) },
+        stats: [{ value: "250K+", label: "Monthly listeners" }, { value: "3M+", label: "Total streams" }, { value: "40", label: "Shows played" }],
+        highlights: [{ title: "Best New Artist", sub: "Sample award 2025" }, { title: "Top 10", sub: "Sample chart" }, { title: "Sold-out show", sub: "Sample venue" }] },
+      { ...SHOW.album.make(), title: "Your album name", year: String(new Date().getFullYear()), cover: "samples/artist/cover-1.jpg" },
+      { ...SHOW.album.make(), title: "Your single", kind: "Single", year: String(new Date().getFullYear() - 1), cover: "samples/artist/cover-3.jpg" },
+      { ...SHOW.album.make(), title: "Your EP", kind: "EP", year: String(new Date().getFullYear() - 2), cover: "samples/artist/cover-2.jpg" },
       { ...SHOW.links.make(), items: ["Spotify", "Apple Music", "Audiomack", "Boomplay", "YouTube", "Instagram", "TikTok"].map(label => ({ label, url: "" })) },
       { ...SHOW.tour.make(), items: [{ city: "", venue: "", date: "", time: "", status: "", url: "" }] },
       SHOW.video.make(),
-      SHOW.gallery.make(),
+      { ...SHOW.gallery.make(), images: ["gallery-3", "gallery-1", "gallery-2", "gallery-4", "cover-4"].map(n => "samples/artist/" + n + ".jpg") },
       SHOW.work.make()] },
 
   fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample pictures you can replace.",
