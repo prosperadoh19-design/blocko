@@ -373,18 +373,31 @@ const TEMPLATES = {
       SHOW.gallery.make(),
       SHOW.work.make()] },
 
-  fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Nothing to fill in.",
-    brand: { layout: "fashion", cover: "backgrounds/silk.jpg", coverMode: "header", tint: 0.5 },
+  fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample pictures you can replace.",
+    brand: { layout: "fashion", cover: "samples/fashion/header-background.jpg", coverMode: "header", tint: 0.5 },
     title: "Your Brand", description: "Ready-to-wear · Bridal · Bespoke tailoring",
-    blocks: () => [
-      { ...SHOW.maison.make(), season: "Autumn / Winter " + new Date().getFullYear(), heroTitle: "Elegance Defined", headline: "Crafting timeless silhouettes",
-        story: "Tell your story here: where the brand started, what you make and what makes your pieces special.\n\nAdd a second paragraph about your fabrics, your craft and the people who wear your designs.",
-        location: "Lagos, NG", since: String(new Date().getFullYear() - 5),
-        stats: [{ value: "", label: "Years" }, { value: "", label: "Runway shows" }, { value: "", label: "Boutiques" }] },
-      { ...SHOW.lookbook.make(), heading: "The collections" },
-      { ...SHOW.gallery.make(), heading: "Runway & campaign" },
-      SHOW.video.make(),
-      { ...SHOW.links.make(), items: ["Instagram", "TikTok", "Facebook", "Pinterest"].map(label => ({ label, url: "" })) }] },
+    blocks: () => {
+      const S = n => "samples/fashion/" + n + ".jpg";
+      return [
+        { ...SHOW.maison.make(), season: "Autumn / Winter " + new Date().getFullYear() + " Collection", heroTitle: "Elegance Defined", photo: S("designer-photo"), headline: "Crafting timeless silhouettes",
+          story: "Tell your story here: where the brand started, what you make and what makes your pieces special.\n\nAdd a second paragraph about your fabrics, your craft and the people who wear your designs.",
+          location: "Lagos, NG", since: String(new Date().getFullYear() - 8),
+          stats: [{ value: "8+", label: "Years" }, { value: "12", label: "Runway shows" }, { value: "2", label: "Boutiques" }],
+          press: "Lagos Fashion Week, GTCO Fashion Weekend, Arise Fashion Week",
+          boutiques: [{ city: "Lekki, Lagos", address: "Your boutique address", hours: "Mon–Sat 10am – 7pm" }],
+          appointments: "Private fittings by appointment. Custom orders take 2–3 weeks." },
+        { ...SHOW.lookbook.make(), heading: "The collections", items: [
+          ["1-silk-evening-gown", "Silk evening gown", "₦450,000", "Evening", "Red silk with a hand-finished gold waistband."],
+          ["2-aso-oke-bridal-set", "Aso-oke bridal set", "₦1,200,000", "Bridal", "Ivory and gold aso-oke with matching gele and veil."],
+          ["3-ankara-two-piece", "Ankara two-piece", "₦150,000", "Ready-to-wear", "Bold Ankara top and skirt, made to measure."],
+          ["4-embroidered-agbada", "Embroidered agbada", "₦380,000", "Men", "Navy agbada with gold hand embroidery."],
+          ["5-gold-lace-kaftan", "Gold lace kaftan", "₦290,000", "Evening", "Gold lace kaftan for owambe and evening events."],
+          ["6-velvet-tuxedo", "Velvet tuxedo", "₦520,000", "Men", "Black velvet tuxedo with purple satin lapels."]
+        ].map(([f, title, price, collection, desc]) => ({ img: S(f), title, price, collection, desc, url: "" })) },
+        { ...SHOW.gallery.make(), heading: "Runway & campaign", images: ["2-aso-oke-bridal-set", "1-silk-evening-gown", "4-embroidered-agbada", "5-gold-lace-kaftan", "3-ankara-two-piece"].map(S) },
+        SHOW.video.make(),
+        { ...SHOW.links.make(), items: ["Instagram", "TikTok", "Facebook", "Pinterest"].map(label => ({ label, url: "" })) }];
+    } },
 
   onboarding: { name: "Staff onboarding", emoji: "🤝", color: COLORS[0], cat: "HR & team", d: "New-hire details, documents and policy sign-off.", brand: BG("colors"),
     access: "code", accessCode: true,
@@ -818,7 +831,10 @@ async function viewEditor(id) {
     const g = h("div", { class: "edit-grid" });
     if (b.type === "heading") g.append(h("input", { class: "input", value: b.text, placeholder: "Section title", "aria-label": "Heading text", style: { fontWeight: 800, fontSize: "22px" }, oninput: e => { b.text = e.target.value; save(); } }));
     else if (b.type === "text") { const ta = h("textarea", { class: "textarea", value: b.text, placeholder: "Write anything: instructions, details, terms. Links become clickable.", "aria-label": "Text", oninput: e => { b.text = e.target.value; save(); } }); g.append(ta); }
-    else if (SHOW[b.type]) SHOW[b.type].edit(b, g, save);
+    else if (SHOW[b.type]) {
+      if (JSON.stringify(b).includes('"samples/')) g.append(h("div", { class: "sample-note" }, "✨ These are sample pictures so you can see how the page looks. Tap a picture or its Change button to replace it with yours, or Delete/✕ to remove it."));
+      SHOW[b.type].edit(b, g, save);
+    }
     else if (b.type === "divider") g.append(h("hr", { style: { border: 0, borderTop: "3px solid var(--line)", width: "100%" } }));
     else if (b.type === "image") {
       const prev = h("div");
@@ -1913,7 +1929,7 @@ Object.assign(SHOW, {
         } }, icon("plus"), h("span", null, list.length ? "Add more looks" : "Add looks (pick several photos)"));
         box.replaceChildren(dl, ...list.map((it, i) => h("div", { class: "wk-ed lk-look" },
           h("div", { class: "wk-ed-top" }, h("button", { class: "wk-pic tall", type: "button", title: "Change photo", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => { try { it.img = await store.uploadMedia(await compressImage(f, 1400, false)); save(); draw(); } catch (e) { toast(e.message); } }) },
-              it.img ? h("img", { src: it.img, alt: "" }) : h("span", null, "+ Photo")),
+              it.img ? [h("img", { src: it.img, alt: "" }), h("span", { class: "pic-change" }, "Change")] : h("span", null, "+ Photo")),
             h("div", { class: "edit-grid", style: { gap: "6px" } }, fld(it, "title", "Look name, e.g. Silk evening gown", save),
               h("div", { class: "sc-row2", style: { gridTemplateColumns: "1fr 1fr" } }, fld(it, "price", "Price, e.g. ₦350,000", save, { max: 30 }),
                 h("input", { class: "input", value: it.collection || "", placeholder: "Collection, e.g. Bridal", maxLength: 40, list: "cols-" + b.id, "aria-label": "Collection", oninput: e => { it.collection = e.target.value; save(); }, onchange: () => draw() })),
