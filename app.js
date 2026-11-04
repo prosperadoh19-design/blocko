@@ -68,6 +68,13 @@ const MUSIC_PHOTOS = { stage: "1470229722913-7c0e2dbbafd3", crowd: "150615778615
 BACKGROUNDS.push(...[["Concert lights", "stage"], ["Festival crowd", "crowd"], ["Empty stage", "emptyStage"], ["Smoky stage", "smoke"], ["Recording studio", "studio"], ["Studio mic", "mic"],
   ["Mixing desk", "mixer"], ["DJ decks", "dj"], ["Neon guitar", "guitar"], ["Guitar wall", "guitarWall"], ["Piano", "piano"], ["Drums", "drums"], ["Saxophone", "sax"], ["Turntable", "turntable"], ["Vinyl", "vinyl"]]
   .map(([n, k]) => [n, UNSPLASH(MUSIC_PHOTOS[k]), UNSPLASH(MUSIC_PHOTOS[k], 300, 200)]));
+const FASHION_PHOTOS = { redGown: "1583039949165-96ee24b0d8de", bridal: "1585241920473-b472eb9ffbae", printMaxi: "1601653233006-5c9fd30eab12", headwrap: "1625646741211-711bdd65c570",
+  dashiki: "1556452576-3e2d58536f62", purpleGown: "1760893107461-baee57948240", blueSuit: "1617137984095-74e4e5e3613f", yellowWall: "1696962678565-bee84e6b9cb6",
+  atelier: "1764298493231-59ae059cdc7e", sketching: "1787505136219-be2d0398fe2a", runway: "1605289355680-75fb41239154", show: "1543728069-a3f97c5a2f32", sketches: "1557777586-f6682739fcf3",
+  boutique: "1441984904996-e0b6ba687e04", hangers: "1490481651871-ab68de25d43d", linen: "1528458909336-e7a0adfed0a5", threads: "1542044801-30d3e45ae49a", sewing: "1466027397211-20d0f2449a3f", rack: "1540221652346-e5dd6b50f3e7" };
+BACKGROUNDS.push(...[["Clothing rail", "hangers"], ["Boutique", "boutique"], ["Clothes rack", "rack"], ["Atelier", "atelier"], ["Runway", "runway"], ["Fashion show", "show"],
+  ["Design sketches", "sketches"], ["Sewing machine", "sewing"], ["Threads", "threads"], ["Linen fabric", "linen"]]
+  .map(([n, k]) => [n, UNSPLASH(FASHION_PHOTOS[k]), UNSPLASH(FASHION_PHOTOS[k], 300, 200)]));
 const COLORS = ["#7b3ff2", "#ff5a1f", "#ff3e9a", "#1f6bff", "#00b86b", "#00a7a7", "#e0a800", "#141318"];
 const EMOJIS = "📝 📋 🎉 💼 🚀 💬 ⭐ 🛒 🎟️ 📅 🍕 ❤️ 🏆 🎨 🎵 📚 💡 🧾 🏠 🧑‍💻 🤝 📣 ✈️ 🌱 ⚽ 🧪 💰 📦 🔔 ✅".split(" ");
 const TYPES = {
@@ -388,13 +395,13 @@ const TEMPLATES = {
       { ...SHOW.gallery.make(), images: ["concert", "band", "drummer", "micBokeh", "crowd"].map(k => UNSPLASH(MUSIC_PHOTOS[k], 1600)) },
       SHOW.work.make()] },
 
-  fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample pictures you can replace.",
-    brand: { layout: "fashion", cover: "samples/fashion/header-background.jpg", coverMode: "header", tint: 0.5 },
+  fashion: { name: "Fashion brand website", emoji: "👗", color: COLORS[7], cat: "Fashion", d: "A luxury black-and-gold site for your label: lookbook with prices, collections, runway photos, boutiques and WhatsApp orders. Comes with sample photos you can replace.",
+    brand: { layout: "fashion", cover: UNSPLASH(FASHION_PHOTOS.hangers), coverMode: "header", tint: 0.5 },
     title: "Your Brand", description: "Ready-to-wear · Bridal · Bespoke tailoring",
     blocks: () => {
-      const S = n => "samples/fashion/" + n + ".jpg";
+      const F = (k, w, hh) => UNSPLASH(FASHION_PHOTOS[k], w, hh);
       return [
-        { ...SHOW.maison.make(), season: "Autumn / Winter " + new Date().getFullYear() + " Collection", heroTitle: "Elegance Defined", photo: S("designer-photo"), headline: "Crafting timeless silhouettes",
+        { ...SHOW.maison.make(), season: "Autumn / Winter " + new Date().getFullYear() + " Collection", heroTitle: "Elegance Defined", photo: F("atelier", 1000, 1250), headline: "Crafting timeless silhouettes",
           story: "Tell your story here: where the brand started, what you make and what makes your pieces special.\n\nAdd a second paragraph about your fabrics, your craft and the people who wear your designs.",
           location: "Lagos, NG", since: String(new Date().getFullYear() - 8),
           stats: [{ value: "8+", label: "Years" }, { value: "12", label: "Runway shows" }, { value: "2", label: "Boutiques" }],
@@ -402,14 +409,15 @@ const TEMPLATES = {
           boutiques: [{ city: "Lekki, Lagos", address: "Your boutique address", hours: "Mon–Sat 10am – 7pm" }],
           appointments: "Private fittings by appointment. Custom orders take 2–3 weeks." },
         { ...SHOW.lookbook.make(), heading: "The collections", items: [
-          ["1-silk-evening-gown", "Silk evening gown", "₦450,000", "Evening", "Red silk with a hand-finished gold waistband."],
-          ["2-aso-oke-bridal-set", "Aso-oke bridal set", "₦1,200,000", "Bridal", "Ivory and gold aso-oke with matching gele and veil."],
-          ["3-ankara-two-piece", "Ankara two-piece", "₦150,000", "Ready-to-wear", "Bold Ankara top and skirt, made to measure."],
-          ["4-embroidered-agbada", "Embroidered agbada", "₦380,000", "Men", "Navy agbada with gold hand embroidery."],
-          ["5-gold-lace-kaftan", "Gold lace kaftan", "₦290,000", "Evening", "Gold lace kaftan for owambe and evening events."],
-          ["6-velvet-tuxedo", "Velvet tuxedo", "₦520,000", "Men", "Black velvet tuxedo with purple satin lapels."]
-        ].map(([f, title, price, collection, desc]) => ({ img: S(f), title, price, collection, desc, url: "" })) },
-        { ...SHOW.gallery.make(), heading: "Runway & campaign", images: ["2-aso-oke-bridal-set", "1-silk-evening-gown", "4-embroidered-agbada", "5-gold-lace-kaftan", "3-ankara-two-piece"].map(S) },
+          ["redGown", "Red silk evening gown", "₦450,000", "Evening", "Flowing red silk with a fitted bodice."],
+          ["bridal", "Lace bridal gown", "₦1,200,000", "Bridal", "Ivory lace with a long train, made to measure."],
+          ["printMaxi", "Print maxi dress", "₦180,000", "Ready-to-wear", "Bold African print, cut for movement."],
+          ["headwrap", "Print set with head wrap", "₦150,000", "Ready-to-wear", "Matching print top, skirt and gele."],
+          ["purpleGown", "Embellished evening gown", "₦680,000", "Evening", "Hand-beaded floral appliqué on tulle."],
+          ["dashiki", "Embroidered dashiki", "₦95,000", "Men", "Printed cotton with embroidered neckline."],
+          ["blueSuit", "Tailored blue suit", "₦420,000", "Men", "Two-piece suit, tailored to your measurements."]
+        ].map(([k, title, price, collection, desc]) => ({ img: F(k, 900, 1200), title, price, collection, desc, url: "" })) },
+        { ...SHOW.gallery.make(), heading: "Runway & campaign", images: ["runway", "show", "yellowWall", "sketches", "rack"].map(k => F(k, 1600)) },
         SHOW.video.make(),
         { ...SHOW.links.make(), items: ["Instagram", "TikTok", "Facebook", "Pinterest"].map(label => ({ label, url: "" })) }];
     } },
