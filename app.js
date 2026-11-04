@@ -826,26 +826,62 @@ function aboutField(page, save) {
         list.length < 4 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.stats = [...list, { value: "", label: "" }]; save(); drawStats(); } }, "+ Add a number") : null);
     };
     drawStats();
-    // photo
+    // still picture
     const photo = h("div", { class: "brand-slot" });
     const drawPhoto = () => {
       const btn = h("button", { class: "btn small dark", type: "button", onclick: () => pickFile("image/png,image/jpeg,image/webp", async f => {
         btn.disabled = true; btn.textContent = "Uploading…";
-        try { b.about.photo = await store.uploadMedia(await compressImage(f, 1400, false)); save(); drawPhoto(); toast("Photo added"); }
+        try { b.about.photo = await store.uploadMedia(await compressImage(f, 1400, false)); save(); drawPhoto(); toast("Picture added"); }
         catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Upload"; }
       }) }, b.about.photo ? "Change" : "Upload");
-      photo.replaceChildren(h("div", { class: "brand-thumb cover" }, b.about.photo ? h("img", { src: b.about.photo, alt: "" }) : h("span", null, "Photo")),
-        h("div", { class: "brand-acts" }, h("b", null, "Team or office photo"), h("small", { class: "muted" }, "Optional."),
+      photo.replaceChildren(h("div", { class: "brand-thumb cover" }, b.about.photo ? h("img", { src: b.about.photo, alt: "" }) : h("span", null, "Picture")),
+        h("div", { class: "brand-acts" }, h("b", null, "Main picture"), h("small", { class: "muted" }, "Stays still. Your office, team or product."),
           h("div", { style: { display: "flex", gap: "6px" } }, btn, b.about.photo ? h("button", { class: "btn small", type: "button", onclick: () => { delete b.about.photo; save(); drawPhoto(); } }, "Remove") : null)));
     };
     drawPhoto();
+    // slideshow pictures
+    const slides = h("div", { class: "field" });
+    const drawSlides = () => {
+      const list = b.about.slides || [];
+      const add = h("button", { class: "btn small dark", type: "button", onclick: () => {
+        const i = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", multiple: true });
+        i.onchange = async () => {
+          const files = [...i.files].slice(0, 10 - list.length); if (!files.length) return;
+          add.disabled = true; add.textContent = "Uploading…";
+          try { const urls = []; for (const f of files) urls.push(await store.uploadMedia(await compressImage(f, 1400, false)));
+            b.about.slides = [...(b.about.slides || []), ...urls]; save(); toast(urls.length === 1 ? "Picture added" : urls.length + " pictures added"); }
+          catch (e) { toast(e.message); }
+          drawSlides();
+        };
+        i.click();
+      } }, "+ Add pictures");
+      slides.replaceChildren("Slideshow pictures",
+        h("small", { class: "muted", style: { fontWeight: 400 } }, "These slide sideways on their own. Add up to 10, like past projects or events."),
+        list.length ? h("div", { class: "slide-thumbs" }, list.map((u, i) => h("div", { class: "slide-thumb" }, h("img", { src: u, alt: "" }),
+          h("button", { type: "button", "aria-label": "Remove picture", onclick: () => { list.splice(i, 1); b.about.slides = list; save(); drawSlides(); } }, "✕")))) : null,
+        list.length < 10 ? h("div", null, add) : null);
+    };
+    drawSlides();
+    // links
+    const links = h("div", { class: "field" });
+    const drawLinks = () => {
+      const list = b.about.links || [];
+      links.replaceChildren("Links",
+        h("small", { class: "muted", style: { fontWeight: 400 } }, "Up to 5 buttons people can tap, like Instagram, your brochure or a video."),
+        ...list.map((l, i) => h("div", { class: "link-ed" },
+          h("input", { class: "input", value: l.label || "", placeholder: "Button text, e.g. Instagram", maxLength: 40, "aria-label": "Button text", oninput: e => { l.label = e.target.value; save(); } }),
+          h("input", { class: "input", type: "url", value: l.url || "", placeholder: "https://…", maxLength: 300, "aria-label": "Link", oninput: e => { l.url = e.target.value.trim(); save(); } }),
+          h("button", { class: "icon-btn", type: "button", "aria-label": "Remove link", onclick: () => { list.splice(i, 1); save(); drawLinks(); } }, "✕"))),
+        list.length < 5 ? h("button", { class: "btn small", type: "button", onclick: () => { b.about.links = [...list, { label: "", url: "" }]; save(); drawLinks(); } }, "+ Add a link") : null);
+    };
+    drawLinks();
     box.append(
       inp("name", "Company name", page.title || "e.g. Adoh Engineering Ltd", { max: 80 }),
       inp("tagline", "One-line summary", "e.g. Building safe roads across Lagos since 2012", { max: 120 }),
       inp("story", "What you do", "Tell people who you are, what you offer and who you serve.", { area: true, max: 1500 }),
       h("div", { class: "field" }, "Big numbers", h("small", { class: "muted", style: { fontWeight: 400 } }, "Like years in business, projects done or happy clients."), stats),
       inp("wins", "Achievements", "One per line, e.g.\nBest SME Award 2024\nCompleted the Ikeja bridge project", { area: true, max: 1200 }),
-      photo,
+      photo, slides, links,
       inp("website", "Website", "https://", { type: "url", max: 200 }),
       inp("email", "Contact email", "hello@company.com", { type: "email", max: 120 }),
       inp("phone", "Phone or WhatsApp", "+234…", { type: "tel", max: 40 }),
@@ -1174,8 +1210,20 @@ async function viewForm(id, preview) {
   };
   await next();
 }
-function aboutOn(page) { const a = (page.brand || {}).about; return !!(a && a.on && (a.story || a.tagline || (a.stats || []).some(s => s.value) || a.wins)); }
+function aboutOn(page) { const a = (page.brand || {}).about; return !!(a && a.on && (a.story || a.tagline || (a.stats || []).some(s => s.value) || a.wins || a.photo || (a.slides || []).length || (a.links || []).length)); }
 const safeUrl = u => { try { const x = new URL(/^https?:\/\//i.test(u) ? u : "https://" + u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
+function slideshow(urls, color) {
+  const track = h("div", { class: "slides-track" }, urls.map(u => h("div", { class: "slide" }, h("img", { src: u, alt: "", loading: "lazy" }))));
+  const dots = h("div", { class: "slides-dots" }, urls.map((_, i) => h("button", { "aria-label": "Picture " + (i + 1), onclick: () => goTo(i) })));
+  let cur = 0, timer;
+  const paint = () => [...dots.children].forEach((d, i) => { d.classList.toggle("on", i === cur); d.style.background = i === cur ? color : ""; });
+  const goTo = i => { cur = (i + urls.length) % urls.length; track.scrollTo({ left: track.clientWidth * cur, behavior: "smooth" }); paint(); restart(); };
+  const restart = () => { clearInterval(timer); if (urls.length > 1) timer = setInterval(() => { if (!track.isConnected) return clearInterval(timer); goTo(cur + 1); }, 3500); };
+  let st; track.addEventListener("scroll", () => { clearTimeout(st); st = setTimeout(() => { const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); if (i !== cur) { cur = i; paint(); restart(); } }, 120); });
+  const arrow = (dir, label) => urls.length > 1 ? h("button", { class: "slides-arrow " + (dir < 0 ? "prev" : "next"), "aria-label": label, onclick: () => goTo(cur + dir) }, dir < 0 ? "‹" : "›") : null;
+  paint(); restart();
+  return h("div", { class: "slides" }, track, arrow(-1, "Previous picture"), arrow(1, "Next picture"), urls.length > 1 ? dots : null);
+}
 function aboutTeaser(page, open) {
   const a = page.brand.about;
   return h("div", { class: "about-teaser" }, h("small", null, "About"), h("b", null, a.name || page.title || "Us"),
@@ -1191,14 +1239,17 @@ function aboutPage(page, back) {
     a.email ? h("a", { href: "mailto:" + a.email }, "✉️ ", a.email) : null,
     a.phone ? h("a", { href: "tel:" + a.phone.replace(/[^\d+]/g, "") }, "📞 ", a.phone) : null,
     a.address ? h("span", null, "📍 ", a.address) : null].filter(Boolean);
+  const linkBtns = (a.links || []).slice(0, 5).map(l => { const u = l.url && safeUrl(l.url); return u ? h("a", { class: "about-link", href: u, target: "_blank", rel: "noopener", style: { background: page.color } }, (l.label || u.replace(/^https?:\/\//, "").replace(/\/$/, "")), " ↗") : null; }).filter(Boolean);
   return h("article", { class: "about-page" },
     h("div", { class: "about-hero" }, b.logo ? h("img", { class: "about-logo", src: b.logo, alt: "" }) : h("span", { class: "about-emoji" }, page.emoji || "🏢"),
       h("div", null, h("small", null, "About us"), h("h2", null, a.name || page.title || "About us"), a.tagline ? h("p", null, a.tagline) : null)),
     stats.length ? h("div", { class: "about-stats" }, stats.map(s => h("div", { class: "about-stat" }, h("b", { style: { color: page.color } }, s.value), h("span", null, s.label)))) : null,
     a.photo ? h("img", { class: "about-photo", src: a.photo, alt: "", loading: "lazy" }) : null,
+    (a.slides || []).length ? slideshow(a.slides, page.color) : null,
     a.story ? h("section", null, h("h3", null, "What we do"), h("div", { class: "about-story" }, linkify(a.story))) : null,
     wins.length ? h("section", null, h("h3", null, "What we've achieved"), h("ul", { class: "about-wins" }, wins.map(w => h("li", null, h("span", { class: "tick", style: { background: page.color } }, "✓"), w)))) : null,
     contacts.length ? h("section", null, h("h3", null, "Get in touch"), h("div", { class: "about-contacts" }, contacts)) : null,
+    linkBtns.length ? h("section", null, h("h3", null, "Links"), h("div", { class: "about-links" }, linkBtns)) : null,
     h("div", { class: "about-back" }, h("button", { class: "btn brand", style: { background: page.color, borderColor: page.color }, onclick: back }, "← Back to the form")));
 }
 function siteNav(page, preview, tabs) {
